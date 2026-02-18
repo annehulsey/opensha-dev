@@ -63,8 +63,10 @@ public class U3_EAL_ExampleCalc {
 		
 		// output file
 //		File outputCSV = new File("/tmp/eal_demo.csv");
-		String tempDir = System.getProperty("java.io.tmpdir");
-		File outputCSV = new File(tempDir, "eal_demo.csv");
+//		String tempDir = System.getProperty("java.io.tmpdir");
+//		File outputCSV = new File(tempDir, "eal_demo.csv");
+		String workDir = "C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\openSRA_EAL_discrepancy";
+		File outputCSV = new File(workDir, "eal_demo.csv");
 		
 		List<String> assetArrayList = PortfolioParser.parseLine(assetValues);
 		String[] assetValueList = assetArrayList.toArray(new String[0]);
@@ -115,6 +117,8 @@ public class U3_EAL_ExampleCalc {
 			public void updateForecast() {
 				if (this.timeSpan == null)
 					this.timeSpan = new TimeSpan(TimeSpan.NONE, TimeSpan.YEARS);
+			    
+			    this.timeSpan.setDuration(duration, TimeSpan.YEARS);
 			}
 			
 			@Override
