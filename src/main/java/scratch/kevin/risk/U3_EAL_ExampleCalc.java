@@ -51,7 +51,9 @@ public class U3_EAL_ExampleCalc {
 		// Vulnerability models can be loaded in Keith's 'VUL06' file format. Here's how you could do that
 //		VulnerabilityFetcher.getVulnerabilities(new File("/path/to/vul06.csv"));
 		// here's how I call it to preload the vulnerabilities and skip the servlet; uncomment and change to your path
-		VulnerabilityFetcher.getVulnerabilities(new File("/home/kevin/OpenSHA/portfolio_lec/2011_11_07_VUL06.txt"));
+		VulnerabilityFetcher.getVulnerabilities(new File("C:/Users/ahulsey/OneDrive - DOI/Desktop/Research/vulnerabilities/" +
+	            "borrowed_vulnerabilities/Porter_Hazus-and-Curee/from Kevin/" +
+	            "porter_portfolios_and_vulns/2014_05_16b_VUL06.txt"));
 		// or you can put in your own custom implementation like this. we need to make this better...
 //		Vulnerability vuln = new SimpleVulnerability(name, shortName, imType, imLevels, mfdVals, covVals);
 //		VulnerabilityFetcher.getVulnerabilities().put("MyVulnName", vuln);
@@ -60,7 +62,9 @@ public class U3_EAL_ExampleCalc {
 		boolean writeIndividualRupExceedances = true;
 		
 		// output file
-		File outputCSV = new File("/tmp/eal_demo.csv");
+//		File outputCSV = new File("/tmp/eal_demo.csv");
+		String tempDir = System.getProperty("java.io.tmpdir");
+		File outputCSV = new File(tempDir, "eal_demo.csv");
 		
 		List<String> assetArrayList = PortfolioParser.parseLine(assetValues);
 		String[] assetValueList = assetArrayList.toArray(new String[0]);
