@@ -3,12 +3,15 @@ package scratch.kevin.risk;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.opensha.commons.data.CSVFile;
 import org.opensha.commons.data.Site;
 import org.opensha.commons.data.TimeSpan;
 import org.opensha.commons.data.function.ArbitrarilyDiscretizedFunc;
+import org.opensha.commons.data.siteData.SiteData;
+import org.opensha.commons.data.siteData.SiteDataValue;
 import org.opensha.commons.geo.Location;
 import org.opensha.commons.param.Parameter;
 import org.opensha.commons.param.ParameterList;
@@ -24,9 +27,11 @@ import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.imr.ScalarIMR;
 import org.opensha.sha.magdist.GutenbergRichterMagFreqDist;
 import org.opensha.sha.util.FocalMech;
+import org.opensha.sha.util.SiteTranslator;
 import org.opensha.sra.gui.portfolioeal.Asset;
 import org.opensha.sra.gui.portfolioeal.PortfolioParser;
 import org.opensha.sra.vulnerability.VulnerabilityFetcher;
+import org.opensha.sha.calc.HazardCurveCalculator;
 
 import com.google.common.base.Preconditions;
 
@@ -78,19 +83,19 @@ public class U3_EAL_ExampleCalc {
 			System.out.println(assetParams.getParameter(p).getName()+":\t"+assetValueList[p]);
 		asset.setAssetParameters(assetValueList);
 		
-		// now we need an ERF, lets use UCERF3 (FM3.1, excluding background seismicity)
+//		// now we need an ERF, lets use UCERF3 (FM3.1, excluding background seismicity)
 //		MeanUCERF3 erf = new MeanUCERF3();
 //		erf.setPreset(Presets.FM3_1_BRANCH_AVG);
 //		erf.setParameter(IncludeBackgroundParam.NAME, IncludeBackgroundOption.EXCLUDE);
 //		// set to poisson, 1 year
 //		erf.setParameter(ProbabilityModelParam.NAME, ProbabilityModelOptions.POISSON);
 //		erf.getTimeSpan().setDuration(1d);
-		// or use a simple test ERF with a GR point source at a single location
+//		// or use a simple test ERF with a GR point source at a single location
 		// M5-8 range, shows some discrepancy at present
 		double minMag = 5d;
 		double deltaMag = 0.1d;
-		int numMag = 30; // up to M8
-		// single M7 test, matches nearly perfectly
+		int numMag = 31; // up to M8
+//		// single M7 test, matches nearly perfectly
 //		double minMag = 7d;
 //		double deltaMag = 0.1d; // not used
 //		int numMag = 1;
@@ -132,6 +137,7 @@ public class U3_EAL_ExampleCalc {
 				return 1;
 			}
 		};
+		
 		erf.updateForecast();
 		
 		// max source-site dist in KM
@@ -145,10 +151,19 @@ public class U3_EAL_ExampleCalc {
 		gmm.setParamDefaults();
 		
 		// this exists in order to supply all required GMM paremeters, e.g. basin depth, that aren't included in the asset
-		// well set those as default. the location and Vs30 value will be overridden automatically when we do the calculation
+		// we'll set those as default. the location will be overridden automatically when we do the calculation
 		Site site = new Site();
 		for (Parameter<?> param : gmm.getSiteParams())
 			site.addParameter((Parameter<?>) param.clone());
+		
+		// need to update the vs30 here, to be consistent with the update in the calculation
+		double vs30 = (Double)asset.getParameterList().getParameter("Vs30").getValue();
+		SiteDataValue<Double> vs30val = new SiteDataValue<Double>(SiteData.TYPE_VS30, null, vs30);
+		SiteTranslator trans = new SiteTranslator();
+		Iterator<Parameter<?>> it = site.getParametersIterator();
+		while (it.hasNext()) {
+		    trans.setParameterValue(it.next(), vs30val);
+		}
 		
 		// conditional losses for each rupture
 		double[][] rupConditionalLosses = asset.calculateExpectedLossPerRup(gmm, maxDistance, null, site, erf, null);
@@ -162,13 +177,20 @@ public class U3_EAL_ExampleCalc {
 		
 		System.out.println("Difference: "+Math.abs(eal-calcEAL)+" ("+Math.abs(100d*(eal-calcEAL)/calcEAL)+" %)");
 		
-		// lets write out the individual losses to a CSV File
+		// let's write out the individual losses to a CSV File
+		// this is recreating the probabilities of exceedance outside of the asset calculations
+		// this works because the asset class permanently changed the relevant location and vs30 parameters
 		CSVFile<String> csv = new CSVFile<>(false);
+		
+		csv.addLine("VulnModel",(String)asset.getParameterList().getParameter("VulnModel").getValue());
+		csv.addLine("AssetValue",String.valueOf(asset.getValue()));
+		csv.addLine("");
 		
 		List<String> header = new ArrayList<>();
 		header.add("Source ID");
 		header.add("Rupture ID");
 		header.add("Magnitude");
+		header.add("Probability");
 		header.add("Rate");
 		header.add("Conditional Loss");
 		ArbitrarilyDiscretizedFunc logXVals = null;
@@ -189,11 +211,13 @@ public class U3_EAL_ExampleCalc {
 			ProbEqkSource source = erf.getSource(sourceID);
 			for (int rupID=0; rupID<source.getNumRuptures(); rupID++) {
 				ProbEqkRupture rup = source.getRupture(rupID);
+				double probability = rup.getProbability();
 				double rate = rup.getMeanAnnualRate(erf.getTimeSpan().getDuration());
 				List<String> line = new ArrayList<>(header.size());
 				line.add(sourceID+"");
 				line.add(rupID+"");
 				line.add((float)rup.getMag()+"");
+				line.add(probability+"");
 				line.add(rate+"");
 				line.add(rupConditionalLosses[sourceID][rupID]+"");
 				if (writeIndividualRupExceedances) {
@@ -210,7 +234,38 @@ public class U3_EAL_ExampleCalc {
 		// add EAL at the bottom
 		csv.addLine("");
 		csv.addLine("EAL (from cond. losses):", eal+"");
+		
+		// add EAL from traditional calculation
+		csv.addLine("");
 		csv.addLine("EAL (traditional):", calcEAL+"");
+		if (writeIndividualRupExceedances) {
+			HazardCurveCalculator calc = new HazardCurveCalculator();
+			calc.setMaxSourceDistance(maxDistance);
+			ArbitrarilyDiscretizedFunc hazFunctionProbability = new ArbitrarilyDiscretizedFunc();
+			hazFunctionProbability = (ArbitrarilyDiscretizedFunc)calc.getHazardCurve(logXVals, site, gmm, erf);
+			ArbitrarilyDiscretizedFunc hazFunctionRate = new ArbitrarilyDiscretizedFunc();
+			hazFunctionRate = (ArbitrarilyDiscretizedFunc)calc.getAnnualizedRates(hazFunctionProbability, erf.getTimeSpan().getDuration());
+			
+			int imlStartIndex = header.indexOf((float)asset.getVulnModel().getIMLValues()[0] + "");
+			
+			List<String> rateLine = new ArrayList<>();
+			rateLine.add("Hazard Curve Rate");
+			for (int i = 0; i < imlStartIndex-1; i++)
+			    rateLine.add("");
+			for (int i = 0; i < hazFunctionRate.size(); i++)
+			    rateLine.add((float) hazFunctionRate.getY(i) + "");
+			csv.addLine(rateLine);
+			
+			List<String> probLine = new ArrayList<>();
+			probLine.add("Hazard Curve Prob");
+			for (int i = 0; i < imlStartIndex-1; i++)
+			    probLine.add("");
+			for (int i = 0; i < hazFunctionProbability.size(); i++)
+			    probLine.add((float) hazFunctionProbability.getY(i) + "");
+			csv.addLine(probLine);			
+			
+		}
+
 		
 		csv.writeToFile(outputCSV);
 	}
