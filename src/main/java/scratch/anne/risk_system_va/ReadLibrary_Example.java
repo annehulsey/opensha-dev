@@ -24,12 +24,14 @@ public class ReadLibrary_Example {
         System.out.println(library);
 
         // Get a specific vulnerability
-        VulnerabilityModel v = library.getVulnerability("W1-lowrise");
-        System.out.println(v);
+        VulnerabilityModel vuln = library.getVulnerability("W1-lowrise");
+        System.out.println(vuln);
+        System.out.println(vuln.toVerboseString());
         
         // Get another specific vulnerability
-        v = library.getVulnerability("W4-lowrise");
-        System.out.println(v);
+        vuln = library.getVulnerability("W4-lowrise");
+        System.out.println(vuln);
+        System.out.println(vuln.toVerboseString());
         
     }
 }
