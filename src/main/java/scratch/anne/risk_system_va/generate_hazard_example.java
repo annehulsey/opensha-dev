@@ -46,7 +46,8 @@ public class generate_hazard_example {
 //		VulnerabilityFetcher.getVulnerabilities().put("MyVulnName", vuln);
 		
 		// output file
-		File outputCSV = new File("/tmp/eal_demo.csv");
+		String tempDir = System.getProperty("java.io.tmpdir");
+		File outputCSV = new File(tempDir, "eal_demo.csv");
 		
 		List<String> assetArrayList = PortfolioParser.parseLine(assetValues);
 		String[] assetValueList = assetArrayList.toArray(new String[0]);
