@@ -22,15 +22,19 @@ public class ReadLibrary_Example {
         
         // Print library metadata
         System.out.println(library);
+        System.out.println();
+        System.out.println();
 
         // Get a specific vulnerability
         VulnerabilityModel vuln = library.getVulnerability("W1-lowrise");
         System.out.println(vuln);
+        System.out.println();
         System.out.println(vuln.toVerboseString());
         
         // Get another specific vulnerability
         vuln = library.getVulnerability("W4-lowrise");
         System.out.println(vuln);
+        System.out.println();
         System.out.println(vuln.toVerboseString());
         
     }
