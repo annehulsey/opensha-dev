@@ -7,7 +7,7 @@ import scratch.anne.risk_system_va.hazard.TestHazardCurveReader;
 import scratch.anne.risk_system_va.vulnerabilities.VulnerabilityLibrary;
 import scratch.anne.risk_system_va.vulnerabilities.VulnerabilityLibraryReader;
 
-public class nELExample {
+public class nELossExample {
 
     public static void main(String[] args) throws Exception {
         // -------------------------------
@@ -66,10 +66,10 @@ public class nELExample {
             }
             
             // create new calculator
-	        nELCalculator calc = new nELCalculator(
+	        nELossCalculator calc = new nELossCalculator(
 	                elV,
 	                hazardValue,
-	                nELCalculator.IntegrationMethod.RIEMANN // default
+	                nELossCalculator.IntegrationMethod.RIEMANN // default
 	        );
 	
 	        double nEL = calc.compute();
