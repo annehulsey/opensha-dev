@@ -1,7 +1,10 @@
-package scratch.anne.risk_system_va;
+package scratch.anne.risk_system_va.calc.eloss;
 
 import java.nio.file.*;
 import java.util.*;
+
+import scratch.anne.risk_system_va.vulnerabilities.VulnerabilityLibrary;
+import scratch.anne.risk_system_va.vulnerabilities.VulnerabilityLibraryReader;
 
 public class ELossVulnReaderExample {
 
