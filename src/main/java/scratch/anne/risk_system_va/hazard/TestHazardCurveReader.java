@@ -1,4 +1,4 @@
-package scratch.anne.risk_system_va;
+package scratch.anne.risk_system_va.hazard;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

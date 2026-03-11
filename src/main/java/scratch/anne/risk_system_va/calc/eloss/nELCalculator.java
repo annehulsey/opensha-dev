@@ -1,4 +1,4 @@
-package scratch.anne.risk_system_va;
+package scratch.anne.risk_system_va.calc.eloss;
 
 /**
  * Basic normalized expected loss (nEL) calculator for a single vulnerability and hazard curve.
