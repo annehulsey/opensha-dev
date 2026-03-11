@@ -16,7 +16,7 @@ package scratch.anne.risk_system_va.calc.eloss;
  *			</blockquote>
  * </blockquote>
  */
-public class nELCalculator {
+public class nELossCalculator {
 
     public enum IntegrationMethod { RIEMANN, CLOSED_FORM }
 
@@ -31,7 +31,7 @@ public class nELCalculator {
      * @param hazardValue Hazard value (rate or probability of exceedance at vuln's imEdges)
      * @param method      Integration method (default: RIEMANN)
      */
-    public nELCalculator(ELossVulnerability vuln,
+    public nELossCalculator(ELossVulnerability vuln,
                          double[] hazardValue,
                          IntegrationMethod method) {
         if (vuln.getImEdges().length != hazardValue.length)
