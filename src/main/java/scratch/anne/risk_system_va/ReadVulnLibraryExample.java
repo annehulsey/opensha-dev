@@ -2,7 +2,7 @@ package scratch.anne.risk_system_va;
 
 import java.nio.file.*;
 
-public class ReadLibrary_Example {
+public class ReadVulnLibraryExample {
 
     public static void main(String[] args) throws Exception {
         // Create Path to a file
