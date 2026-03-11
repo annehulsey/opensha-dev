@@ -69,7 +69,7 @@ public class nELExample {
 	        );
 	
 	        double nEL = calc.compute();
-	        System.out.printf("Vulnerability: %s, nEL = %.3e%n", elV.getName(), nEL);
+	        System.out.printf("Vulnerability: %s, nEL = %.6e%n", elV.getName(), nEL);
 	        }
     }
 }

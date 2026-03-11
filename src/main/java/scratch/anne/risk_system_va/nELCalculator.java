@@ -7,6 +7,13 @@ package scratch.anne.risk_system_va;
  * Expected Loss depends on the hazard definition, typically Expected Annual Loss (EAL). <br>
  * Accepts either rate or probability of exceedance. NOTE: risk convolution is formally defined in rate-space. <br>
  * Uses Riemann or Closed-Form integration.
+ * <blockquote>
+ * 		Close-Form solution: <br>
+ * 		Porter, K.A.,C.R. Scawthorn, and J.L. Beck, 2006. Cost-effectiveness of stronger
+ *			woodframe buildings. <br>
+ *          Earthquake Spectra 22 (1), February 2006, 239-266, Equation #2 <br>
+ *		    http://www.sparisk.com/pubs/Porter-2006-woodframe.pdf
+ *			</blockquote>
  * </blockquote>
  */
 public class nELCalculator {
@@ -73,10 +80,30 @@ public class nELCalculator {
         return nEL;
     }
 
-    // ---------------------- Placeholder Closed-Form ----------------------
+    // ---------------------- Porter Closed-Form Integration ----------------------
     private double computeClosedForm() {
-        // TODO: implement closed-form equation by Porter
-        // For now, fallback to Riemann
-        return computeRiemann();
+        double[] iml = vuln.getImEdges();
+        double[] df = vuln.getDrEdges();
+        double[] mafe = hazardValue;  // MAFE = hazard values directly
+
+        double nEL = 0.0;
+
+        for (int i = 1; i < iml.length; i++) {
+            double imlDelta = iml[i] - iml[i - 1];
+            double dfDelta = df[i] - df[i - 1];
+
+            double g = Math.log(mafe[i] / mafe[i - 1]) / imlDelta;
+
+            double term1 = df[i - 1] * mafe[i - 1] * (1.0 - Math.exp(g * imlDelta));
+            double term2 = (dfDelta / imlDelta) * mafe[i - 1] *
+                           (Math.exp(g * imlDelta) * (imlDelta - 1.0 / g) + 1.0 / g);
+
+            double deltaNEL = term1 - term2;
+            if (!Double.isNaN(deltaNEL) && !Double.isInfinite(deltaNEL)) {
+                nEL += deltaNEL;
+            }
+        }
+
+        return nEL;
     }
 }
