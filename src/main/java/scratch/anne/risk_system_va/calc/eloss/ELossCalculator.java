@@ -1,7 +1,7 @@
 package scratch.anne.risk_system_va.calc.eloss;
 
 /**
- * Basic normalized expected loss (nEL) calculator for a single vulnerability and hazard curve.
+ * Basic normalized expected loss (EL) calculator for a single vulnerability and hazard curve.
  * <blockquote>
  * Loss is normalized by the asset value (0 to 1). <br>
  * Expected Loss depends on the hazard definition, typically Expected Annual Loss (EAL). <br>
@@ -16,7 +16,7 @@ package scratch.anne.risk_system_va.calc.eloss;
  *			</blockquote>
  * </blockquote>
  */
-public class nELossCalculator {
+public class ELossCalculator {
 
     public enum IntegrationMethod { RIEMANN, CLOSED_FORM }
 
@@ -31,7 +31,7 @@ public class nELossCalculator {
      * @param hazardValue Hazard value (rate or probability of exceedance at vuln's imEdges)
      * @param method      Integration method (default: RIEMANN)
      */
-    public nELossCalculator(ELossVulnerability vuln,
+    public ELossCalculator(ELossVulnerability vuln,
                          double[] hazardValue,
                          IntegrationMethod method) {
         if (vuln.getImEdges().length != hazardValue.length)
