@@ -126,6 +126,46 @@ public class ELossCalculator {
         this.hazardValues = null;
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
     }
+    
+    /**
+     * Constructor using only the vulnerability.
+     * Hazard must be supplied later via compute().
+     * Integration method defaults to RIEMANN.
+     *
+     * @param vuln Prepared ELossVulnerability
+     */
+    public ELossCalculator(ELossVulnerability vuln) {
+        this.vuln = vuln;
+        this.hazardValues = null;
+        this.method = null;
+    }
+    
+    /**
+     * Constructor using only IM and DR arrays.
+     * Builds ELossVulnerability internally; hazard must be supplied later via compute().
+     * Integration method defaults to RIEMANN if not specified.
+     *
+     * @param imEdges Array of intensity measure values
+     * @param drEdges Array of damage ratio values
+     * @param method  Integration method; if null, defaults to RIEMANN
+     */
+    public ELossCalculator(double[] im, double[] dr, IntegrationMethod method) {
+        this(new ELossVulnerability(im, dr), method);
+    }
+
+    /**
+     * Constructor using only IM and DR arrays.
+     * Builds ELossVulnerability internally; hazard must be supplied later via compute().
+     * Integration method defaults to RIEMANN.
+     *
+     * @param imEdges Array of intensity measure values
+     * @param drEdges Array of damage ratio values
+     */
+    public ELossCalculator(double[] im, double[] dr) {
+        this.vuln = new ELossVulnerability(im, dr);
+        this.hazardValues = null;
+        this.method = null;
+    }
 
  // -------------------- Compute Overloads --------------------
 
