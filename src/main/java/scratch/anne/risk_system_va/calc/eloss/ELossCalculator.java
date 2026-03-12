@@ -62,23 +62,21 @@ public class ELossCalculator {
     private double computeRiemann() {
         double nEL = 0.0;
         double[] drMid = vuln.getDrMid();
+        
+        int n = drMid.length;
 
-        // Compute delta hazardValue for each bin
-        double[] deltaHazard = new double[hazardValue.length];
-        for (int i = 0; i < hazardValue.length - 1; i++) {
-            deltaHazard[i] = hazardValue[i] - hazardValue[i + 1];
+        // interior bins
+        for (int i = 0; i < drMid.length - 1; i++) {
+            double deltaHazard = hazardValue[i] - hazardValue[i + 1];
+            nEL += drMid[i] * deltaHazard;
         }
-        deltaHazard[hazardValue.length - 1] = hazardValue[hazardValue.length - 1]; // tail bin
-        // adding the tail hazard as the left edge of the final bin is consistent with
-        // the vulnerability's construction of the mid-bin DR values + final DR value
 
-        // Riemann sum
-        for (int i = 0; i < drMid.length; i++) {
-            nEL += drMid[i] * deltaHazard[i];
-        }
+        // tail bin
+        nEL += drMid[n - 1] * hazardValue[n - 1];
 
         return nEL;
     }
+
 
     // ---------------------- Porter Closed-Form Integration ----------------------
     private double computeClosedForm() {
