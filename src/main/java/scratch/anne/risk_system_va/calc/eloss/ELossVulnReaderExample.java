@@ -25,25 +25,31 @@ public class ELossVulnReaderExample {
             // ---------- Step 2: Define the portfolio ----------
             List<String> portfolioNames = Arrays.asList("W1-lowrise", "W2-midrise");
 
-            // ---------- Step 3: Prepare for EAL ----------
-            List<ELossVulnerability> prepared = ELossVulnerabilityPreparer.prepare(
+            // ---------- Step 3: Prepare for estimated loss calcs ----------
+            ELossVulnerabilityLibrary elossLib = ELossVulnerabilityPreparer.prepare(
                     library,
                     portfolioNames,
                     false  // no interpolation
             );
 
-            // ---------- Step 4: Print the prepared vulnerabilities ----------
-            for (ELossVulnerability ev : prepared) {
-            	 System.out.println(ev);
+         // ---------- Step 4a: Print all vulnerabilities ----------
+            System.out.println("\nAll prepared ELoss Vulnerabilities:");
+            for (ELossVulnerability ev : elossLib.all()) {
+            	System.out.println(ev);
             }
-            	
-//                System.out.println("Prepared ELoss Vulnerability: " + ev.getName());
-//                System.out.println("IM edges: " + Arrays.toString(ev.getImEdges()));
-//                System.out.println("IM mid:   " + Arrays.toString(ev.getImMid()));
-//                System.out.println("DR edges: " + Arrays.toString(ev.getDrEdges()));
-//                System.out.println("DR mid:   " + Arrays.toString(ev.getDrMid()));
-//                System.out.println();
-//            }
+
+            // ---------- Step 4b: Example lookup by IMT + x-values key ----------
+            // Pick first vulnerability as an example from the library
+            ELossVulnerability example = elossLib.all().iterator().next();  // first element
+
+            String imtStr = example.getImtString();
+            double[] xValues = example.getImEdges();
+
+            List<ELossVulnerability> grouped = elossLib.getByKey(imtStr, xValues);
+            System.out.println("\nVulnerabilities sharing the same IMT + x-values as " + example.getName() + ":");
+            for (ELossVulnerability ev : grouped) {
+                System.out.println(" - " + ev.getName());
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
