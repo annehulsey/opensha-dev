@@ -2,11 +2,12 @@ package scratch.anne.risk_system_va.portfolio;
 
 import java.util.*;
 
+/**
+ * Immutable portfolio of assets plus metadata.
+ */
 public class Portfolio {
-
     private final List<Asset> assets;
 
-    // metadata
     private final String portfolioSource;
     private final String attributeUnits;
     private final String vulnerabilityModelSource;
@@ -21,7 +22,6 @@ public class Portfolio {
                      String coordinateReference,
                      String description,
                      String creationInfo) {
-
         this.assets = new ArrayList<>(assets);
         this.portfolioSource = portfolioSource;
         this.attributeUnits = attributeUnits;
@@ -31,42 +31,25 @@ public class Portfolio {
         this.creationInfo = creationInfo;
     }
 
-    public List<Asset> getAssets() {
-        return assets;
-    }
+    public List<Asset> getAssets() { return assets; }
+    public int size() { return assets.size(); }
 
-    public int size() {
-        return assets.size();
-    }
-
-    /**
-     * Return the set of vulnerability model names referenced by this portfolio.
-     */
+    /** Returns unique vulnerability names used in this portfolio */
     public List<String> getVulnerabilityNames() {
-
         Set<String> names = new LinkedHashSet<>();
-
         for (Asset asset : assets) {
             names.add(asset.getVulnModel());
         }
-
         return new ArrayList<>(names);
     }
 
     @Override
     public String toString() {
-        return "Portfolio{" +
-                "nAssets=" + assets.size() +
-                ", source='" + portfolioSource + '\'' +
-                ", description='" + description + '\'' +
-                '}';
+        return String.format("Portfolio[nAssets=%d, source=%s, description=%s]",
+                             assets.size(), portfolioSource, description);
     }
-    
- // ------------------- Nested SiteKey class -------------------
-    /**
-     * Represents a unique site: combination of location (lat/lon) and Vs30.
-     * Can be used as a key for grouping assets that share the same site parameters.
-     */
+
+    // ---------------- Nested SiteKey class ----------------
     public static class SiteKey {
         private final double lat;
         private final double lon;
@@ -95,9 +78,7 @@ public class Portfolio {
         }
 
         @Override
-        public int hashCode() {
-            return hash;
-        }
+        public int hashCode() { return hash; }
 
         @Override
         public String toString() {

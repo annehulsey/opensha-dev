@@ -38,7 +38,7 @@ public class ELossCalculator {
      * @param method      Integration method (default: RIEMANN)
      */
     public ELossCalculator(ELossVulnerability vuln, double[] hazard, IntegrationMethod method) {
-        if (hazard != null && vuln.getImEdges().length != hazard.length) {
+        if (hazard != null && vuln.getImValues().length != hazard.length) {
             throw new IllegalArgumentException("vuln IM and hazard array lengths must match");
         }
         this.vuln = vuln;
@@ -68,7 +68,7 @@ public class ELossCalculator {
      */
     public ELossCalculator(ELossVulnerability vuln, DiscretizedFunc hazardFunc, IntegrationMethod method) {
         this.vuln = vuln;
-        this.hazardValues = convertHazFuncToArray(hazardFunc, vuln.getImEdges());
+        this.hazardValues = convertHazFuncToArray(hazardFunc, vuln.getImValues());
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
     }
 
@@ -179,7 +179,7 @@ public class ELossCalculator {
 
     /** Provide hazard as double array */
     public double compute(double[] hazard) {
-        if (hazard.length != vuln.getImEdges().length) {
+        if (hazard.length != vuln.getImValues().length) {
             throw new IllegalArgumentException("Hazard array length does not match vulnerability IM length");
         }
         this.hazardValues = hazard.clone();
@@ -188,7 +188,7 @@ public class ELossCalculator {
 
     /** Provide hazard as DiscretizedFunc (checks IMs) */
     public double compute(DiscretizedFunc hazardFunc) {
-        this.hazardValues = convertHazFuncToArray(hazardFunc, vuln.getImEdges());
+        this.hazardValues = convertHazFuncToArray(hazardFunc, vuln.getImValues());
         return computeInternal(hazardValues);
     }
     
@@ -229,7 +229,7 @@ public class ELossCalculator {
 
     // ---------------------- Porter Closed-Form Integration ----------------------
     private double computeClosedForm(double[] hazardValues) {
-        double[] iml = vuln.getImEdges();
+        double[] iml = vuln.getImValues();
         double[] df = vuln.getDrEdges();
 
         double nEL = 0.0;
@@ -255,22 +255,55 @@ public class ELossCalculator {
     
  // -------------------- Helper --------------------
 
-    /** Converts hazard function to array, ensuring IMs match */
-    private static double[] convertHazFuncToArray(DiscretizedFunc hazardFunc, double[] vulnIMs) {
+    /**
+     * Converts hazard function to array, ensuring IMs match.
+     * Optionally allows hazardFunc X-values to be log(IMs).
+     *
+     * @param hazardFunc hazard curve (x = IM or log(IM), y = hazard)
+     * @param vulnIMs    vulnerability linear IM values
+     */
+    private static double[] convertHazFuncToArray(
+            DiscretizedFunc hazardFunc,
+            double[] vulnIMs) {
+
         if (hazardFunc.size() != vulnIMs.length) {
-            throw new IllegalArgumentException("Hazard function size does not match vulnerability IM length");
+            throw new IllegalArgumentException(
+                "Hazard function size does not match vulnerability IM length");
         }
 
-        double[] hazardValues = new double[vulnIMs.length];
-        for (int i = 0; i < vulnIMs.length; i++) {
-            if (hazardFunc.getX(i) != vulnIMs[i]) {
+        int n = vulnIMs.length;
+        double[] hazardValues = new double[n];
+
+        // First pass: determine if X matches linear or log(IM)
+        boolean matchesLinear = true;
+        boolean matchesLog = true;
+
+        for (int i = 0; i < n; i++) {
+            double x = hazardFunc.getX(i);
+
+            if (x != vulnIMs[i]) {
+                matchesLinear = false;
+            }
+
+            if (x != Math.log(vulnIMs[i])) {
+                matchesLog = false;
+            }
+
+            if (!matchesLinear && !matchesLog) {
                 throw new IllegalArgumentException(
-                    String.format("IM values do not match at index %d: vuln IM=%f, hazard IM=%f",
-                                  i, vulnIMs[i], hazardFunc.getX(i))
+                    String.format(
+                        "IM values do not match at index %d: vuln IM=%f, hazard IM=%f",
+                        i, vulnIMs[i], x
+                    )
                 );
             }
+        }
+
+        // Second pass: retrieve Y-values (no transformation needed)
+        for (int i = 0; i < n; i++) {
             hazardValues[i] = hazardFunc.getY(i);
         }
+
         return hazardValues;
     }
 }
