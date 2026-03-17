@@ -1,25 +1,26 @@
 package scratch.anne.risk_system_va.portfolio;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 
+/**
+ * Reads a CSV into a Portfolio.
+ */
 public class PortfolioReader {
 
     public static Portfolio readCSV(Path file) throws IOException {
-
         List<String> lines = Files.readAllLines(file);
         List<Asset> assets = new ArrayList<>();
 
-        for (int i = 1; i < lines.size(); i++) {
+        for (int i = 1; i < lines.size(); i++) { // skip header
             String[] t = lines.get(i).split(",");
-
             assets.add(new Asset(
-                t[0],
-                Double.parseDouble(t[1]),
-                Double.parseDouble(t[2]),
-                Double.parseDouble(t[3]),
-                Double.parseDouble(t[4]),
+                t[0], 
+                Double.parseDouble(t[1]), 
+                Double.parseDouble(t[2]), 
+                Double.parseDouble(t[3]), 
+                Double.parseDouble(t[4]), 
                 t[5]
             ));
         }
@@ -30,6 +31,7 @@ public class PortfolioReader {
             "vulnerability JSON",
             "WGS84",
             "portfolio description",
-            "creation info");
+            "creation info"
+        );
     }
 }

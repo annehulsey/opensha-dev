@@ -83,7 +83,7 @@ public class ELossExample {
         if (elossLib != null) {
             // Case 1: prepared ELossVulnerabilityLibrary
             for (ELossVulnerability elV : elossLib.all()) {
-                validateIMMatch(elV.getImEdges(), hazardIMs);
+                validateIMMatch(elV.getImValues(), hazardIMs);
                 ELossCalculator calc = new ELossCalculator(elV, hazardValues, method);
                 double nEL = calc.compute();
                 System.out.printf("Vulnerability: %s, nEL = %.6e%n", elV.getName(), nEL);
@@ -92,7 +92,7 @@ public class ELossExample {
         } else if (customELossVulns != null) {
             // Case 2: manually built ELossVulnerabilities
             for (ELossVulnerability elV : customELossVulns) {
-                validateIMMatch(elV.getImEdges(), hazardIMs);
+                validateIMMatch(elV.getImValues(), hazardIMs);
                 ELossCalculator calc = new ELossCalculator(elV, hazardValues, method);
                 double nEL = calc.compute();
                 System.out.printf("Vulnerability: %s, nEL = %.6e%n", elV.getName(), nEL);

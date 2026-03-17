@@ -1,21 +1,17 @@
 package scratch.anne.risk_system_va.portfolio;
 
+/**
+ * Immutable asset data container.
+ */
 public class Asset {
-
     private final String assetID;
     private final double lat;
     private final double lon;
     private final double vs30;
     private final double value;
-    private final String vulnModel;
+    private final String vulnModel; // vulnerability name
 
-    public Asset(String assetID,
-                 double lat,
-                 double lon,
-                 double vs30,
-                 double value,
-                 String vulnModel) {
-
+    public Asset(String assetID, double lat, double lon, double vs30, double value, String vulnModel) {
         this.assetID = assetID;
         this.lat = lat;
         this.lon = lon;
@@ -31,4 +27,9 @@ public class Asset {
     public double getValue() { return value; }
     public String getVulnModel() { return vulnModel; }
 
+    @Override
+    public String toString() {
+        return String.format("Asset[id=%s, lat=%.5f, lon=%.5f, vs30=%.1f, value=%.2f, vuln=%s]",
+                             assetID, lat, lon, vs30, value, vulnModel);
+    }
 }

@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.opensha.commons.geo.Location;
 import org.opensha.commons.data.Site;
+import org.opensha.commons.param.Parameter;
 import org.opensha.commons.data.function.DiscretizedFunc;
 import org.opensha.commons.data.function.ArbitrarilyDiscretizedFunc;
 import org.opensha.sha.calc.HazardCurveCalculator;
@@ -13,146 +14,147 @@ import org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_WUS_BranchAv
 import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.imr.ScalarIMR;
 
+import scratch.anne.risk_system_va.calc.eloss.ELossCalculator;
 import scratch.anne.risk_system_va.calc.eloss.ELossCalculator.IntegrationMethod;
-import scratch.anne.risk_system_va.portfolio.Asset;
+import scratch.anne.risk_system_va.portfolio.eloss.ELossPortfolio;
+import scratch.anne.risk_system_va.portfolio.eloss.ELossPortfolioPreparer;
+import scratch.anne.risk_system_va.portfolio.eloss.ELossAsset;
+import scratch.anne.risk_system_va.calc.eloss.ELossVulnerabilityLibrary;
+import scratch.anne.risk_system_va.vulnerabilities.VulnerabilityLibrary;
+import scratch.anne.risk_system_va.vulnerabilities.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_va.portfolio.Portfolio;
 import scratch.anne.risk_system_va.portfolio.PortfolioReader;
-import scratch.anne.risk_system_va.calc.eloss.ELossVulnerability;
-import scratch.anne.risk_system_va.calc.eloss.ELossVulnerabilityLibrary;
-import scratch.anne.risk_system_va.calc.eloss.ELossCalculator;
-import scratch.anne.risk_system_va.hazard.RuptureContribution;
-import scratch.anne.risk_system_va.vulnerabilities.IMT;
 
 public class PortfolioELossExample {
 
     public static void main(String[] args) throws Exception {
-    	
+
         // -------------------------
-        // 0) Initialize ERF
+        // 1) Read portfolio and vulnerability library
+        // -------------------------
+        Portfolio portfolio = PortfolioReader.readCSV(
+            Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\portfolio.csv")
+        );
+        List<String> vulnNames = portfolio.getVulnerabilityNames();
+
+        VulnerabilityLibrary library = VulnerabilityLibraryReader.readLibrary(
+            Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\vulnerabilities.json"),
+            "library source",
+            "description",
+            "DR → fraction, IM → g",
+            "date, author, workflow v1.0"
+        );
+
+        ELossVulnerabilityLibrary elossVulnLib = scratch.anne.risk_system_va.calc.eloss.ELossVulnerabilityPreparer.prepare(
+                library, vulnNames, false
+        );
+
+        // -------------------------
+        // 2) Prepare ELossPortfolio
+        // -------------------------
+        ELossPortfolio elossPortfolio = ELossPortfolioPreparer.prepare(portfolio, elossVulnLib);
+
+        System.out.println("Total ELoss assets: " + elossPortfolio.getAssets().size());
+        System.out.println("Site keys: " + elossPortfolio.getSiteKeys());
+
+        // -------------------------
+        // 3) Initialize ERF
         // -------------------------
         NSHM23_WUS_BranchAveragedERF erf = new NSHM23_WUS_BranchAveragedERF();
         erf.getTimeSpan().setDuration(1.0);
         erf.updateForecast();
 
         // -------------------------
-        // 1) Define GMM reference and prepare deque
+        // 4) Define GMM reference and create deque for thread-local GMM and calculators
         // -------------------------
         AttenRelRef gmmRef = AttenRelRef.ASK_2014;
+        ScalarIMR gmm0 = gmmRef.get();  // template for site parameters
+
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
         ArrayDeque<HazardCurveCalculator> calcDeque = new ArrayDeque<>();
 
-        // -------------------------
-        // 2) Prepare portfolio
-        // -------------------------
-        Portfolio portfolio = PortfolioReader.readCSV(
-            Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\portfolio.csv")
-        );
+        // Build sites from ELossPortfolio site keys
+        List<Site> sites = new ArrayList<>();
+        List<ELossAsset.SiteKey> siteKeys = new ArrayList<>(elossPortfolio.getSiteKeys());
 
-        // -------------------------
-        // 3) Group assets by site
-        // -------------------------
-        Map<Portfolio.SiteKey, List<Asset>> siteGroups = new HashMap<>();
-        for (Asset asset : portfolio.getAssets()) {
-            Portfolio.SiteKey siteKey = new Portfolio.SiteKey(
-                asset.getLat(),
-                asset.getLon(),
-                asset.getVs30()
-            );
-            siteGroups.computeIfAbsent(siteKey, k -> new ArrayList<>()).add(asset);
+        for (ELossAsset.SiteKey siteKey : siteKeys) {
+            Site site = new Site(new Location(siteKey.getLat(), siteKey.getLon()));
+            for (Parameter<?> param : gmm0.getSiteParams()) {
+                site.addParameter((Parameter<?>) param.clone());
+            }
+            ((Parameter<Double>) site.getParameter("Vs30")).setValue(siteKey.getVs30());
+            sites.add(site);
         }
 
         // -------------------------
-        // 4) Loop over sites (parallelizable)
+        // 5) Parallel hazard + ELoss computation
         // -------------------------
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-        for (Portfolio.SiteKey siteKey : siteGroups.keySet()) {
-            List<Asset> assetsAtSite = siteGroups.get(siteKey);
+        for (int i = 0; i < sites.size(); i++) {
+            final Site site = sites.get(i);
+            final ELossAsset.SiteKey siteKey = siteKeys.get(i);
 
             futures.add(CompletableFuture.runAsync(() -> {
-                // Thread-local GMM and hazard calculator
-                ScalarIMR gmm;
-                synchronized (gmmDeque) {
-                    gmm = gmmDeque.isEmpty() ? gmmRef.get() : gmmDeque.pop();
-                }
+                ScalarIMR gmm = null;
+                HazardCurveCalculator calc = null;
 
-                HazardCurveCalculator calc;
-                synchronized (calcDeque) {
-                    calc = calcDeque.isEmpty() ? new HazardCurveCalculator() : calcDeque.pop();
-                }
+                try {
+                    // thread-local GMM
+                    synchronized (gmmDeque) {
+                        gmm = gmmDeque.isEmpty() ? gmmRef.get() : gmmDeque.pop();
+                    }
 
-                // Set site parameters for GMM
-                gmm.setSite(new Site(new Location(siteKey.getLat(), siteKey.getLon())));
-                gmm.getParameter("Vs30").setValue(siteKey.getVs30());
+                    // thread-local hazard calculator
+                    synchronized (calcDeque) {
+                        calc = calcDeque.isEmpty() ? new HazardCurveCalculator() : calcDeque.pop();
+                    }
 
-                // -------------------------
-                // 5) Group assets by IMT + x-values (from their vulnerability)
-                // -------------------------
-                Map<AssetGroupKey, List<Asset>> assetGroups = new HashMap<>();
-                for (Asset asset : assetsAtSite) {
-                    ELossVulnerability vuln = asset.getVuln(); // assumes asset references the prepared ELossVulnerability
-                    AssetGroupKey key = new AssetGroupKey(vuln.getImt(), vuln.getImLevels());
-                    assetGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(asset);
-                }
+                    gmm.setSite(site);
 
-                // -------------------------
-                // 6) Compute hazard curves per unique IMT + x-values
-                // -------------------------
-                for (AssetGroupKey key : assetGroups.keySet()) {
-                    DiscretizedFunc hazFunc = new ArbitrarilyDiscretizedFunc();
-                    boolean fullHazard = true; // replace with your logic
+                    // Loop over ImKeys (x-values per ImKey)
+                    Map<ELossAsset.ImKey, List<ELossAsset>> imGroups =
+                            elossPortfolio.getAssetsBySiteAndImKey().get(siteKey);
 
-                    if (fullHazard) {
-                        calc.getHazardCurve(hazFunc, new Site(siteKey.getLat(), siteKey.getLon()), gmm, erf);
-                        for (Asset asset : assetGroups.get(key)) {
-                            ELossCalculator calcEL = new ELossCalculator(asset.getVuln(), hazFunc, IntegrationMethod.RIEMANN);
-                            double nEL = calcEL.compute();
-                            System.out.printf("Asset: %s, nEL=%.6e%n", asset.getAssetID(), nEL);
+                    for (ELossAsset.ImKey imKey : imGroups.keySet()) {
+                        // Build hazard function directly from ImKey x-values
+                        DiscretizedFunc hazFunc = new ArbitrarilyDiscretizedFunc();
+                        for (double x : imKey.getLogImValues()) {
+                            hazFunc.set(x, 0d);
                         }
-                    } else {
-                        List<RuptureContribution> rups = computeRuptureContributions(siteKey, gmm, erf, key);
-                        for (Asset asset : assetGroups.get(key)) {
-                            ELossCalculator calcEL = new ELossCalculator(asset.getVuln(), rups, IntegrationMethod.RIEMANN);
+                        
+                        hazFunc = calc.getHazardCurve(hazFunc, site, gmm, erf);
+                        
+                        double[] hazardY = new double[hazFunc.size()];
+                        for (int j = 0; j < hazFunc.size(); j++) {
+                            hazardY[j] = hazFunc.getY(j);
+                        }
+
+                        for (ELossAsset asset : imGroups.get(imKey)) {
+                            ELossCalculator calcEL = new ELossCalculator(
+                                    elossVulnLib.getByName(asset.getVulnerabilityName()),
+                                    hazardY,
+                                    IntegrationMethod.RIEMANN
+                            );
                             double nEL = calcEL.compute();
-                            System.out.printf("Asset: %s, nEL=%.6e%n", asset.getAssetID(), nEL);
+                            asset.setnEL(nEL);
                         }
                     }
+
+                } catch (Exception e) {
+                    System.err.println("Exception for site " + siteKey);
+                    e.printStackTrace();
+                } finally {
+                    if (gmm != null) synchronized (gmmDeque) { gmmDeque.push(gmm); }
+                    if (calc != null) synchronized (calcDeque) { calcDeque.push(calc); }
                 }
-
-                // Return GMM and calculator to deque
-                synchronized (gmmDeque) { gmmDeque.push(gmm); }
-                synchronized (calcDeque) { calcDeque.push(calc); }
-
             }));
         }
 
         // Wait for all threads to finish
         for (CompletableFuture<Void> f : futures) f.join();
-    }
 
-    // -------------------------
-    // Helper class for grouping by IMT + x-values
-    // -------------------------
-    private static class AssetGroupKey {
-        private final IMT imt;
-        private final double[] xValues;
-        private final int hash;
-
-        public AssetGroupKey(IMT imt, double[] xValues) {
-            this.imt = imt;
-            this.xValues = xValues;
-            this.hash = Arrays.hashCode(xValues) * 31 + imt.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof AssetGroupKey)) return false;
-            AssetGroupKey other = (AssetGroupKey) o;
-            return imt == other.imt && Arrays.equals(xValues, other.xValues);
-        }
-
-        @Override
-        public int hashCode() { return hash; }
+        System.out.println("ELoss computation complete.");
+        elossPortfolio.printSummary();
     }
 }

@@ -43,7 +43,7 @@ public class ELossVulnReaderExample {
             ELossVulnerability example = elossLib.all().iterator().next();  // first element
 
             String imtStr = example.getImtString();
-            double[] xValues = example.getImEdges();
+            double[] xValues = example.getImValues();
 
             List<ELossVulnerability> grouped = elossLib.getByKey(imtStr, xValues);
             System.out.println("\nVulnerabilities sharing the same IMT + x-values as " + example.getName() + ":");
