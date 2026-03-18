@@ -1,8 +1,10 @@
 package scratch.anne.risk_system_va.calc.portfolio;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.opensha.commons.geo.Location;
 import org.opensha.commons.data.Site;
@@ -29,33 +31,37 @@ public class PortfolioELossExample {
 
     public static void main(String[] args) throws Exception {
 
+    	Path outputCSV = Paths.get("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs\\test0.csv");
         // -------------------------
         // 1) Read portfolio and vulnerability library
         // -------------------------
-        Portfolio portfolio = PortfolioReader.readCSV(
-            Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\portfolio.csv")
-        );
+        Path portfolioPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\p366-portfolio_Porter-vuln-approximation_SHORT.csv");
+        Path vulnLibraryPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\Porter_vulns_for_java.json");
+
+        Portfolio portfolio = PortfolioReader.readCSV(portfolioPath);
         List<String> vulnNames = portfolio.getVulnerabilityNames();
 
         VulnerabilityLibrary library = VulnerabilityLibraryReader.readLibrary(
-            Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\vulnerabilities.json"),
+            vulnLibraryPath,
             "library source",
             "description",
             "DR → fraction, IM → g",
             "date, author, workflow v1.0"
         );
 
-        ELossVulnerabilityLibrary elossVulnLib = scratch.anne.risk_system_va.calc.eloss.ELossVulnerabilityPreparer.prepare(
-                library, vulnNames, false
-        );
+        ELossVulnerabilityLibrary elossVulnLib =
+                scratch.anne.risk_system_va.calc.eloss.ELossVulnerabilityPreparer.prepare(
+                        library, vulnNames, false
+                );
 
         // -------------------------
         // 2) Prepare ELossPortfolio
         // -------------------------
-        ELossPortfolio elossPortfolio = ELossPortfolioPreparer.prepare(portfolio, elossVulnLib);
+        ELossPortfolio elossPortfolio =
+                ELossPortfolioPreparer.prepare(portfolio, elossVulnLib);
 
         System.out.println("Total ELoss assets: " + elossPortfolio.getAssets().size());
-        System.out.println("Site keys: " + elossPortfolio.getSiteKeys());
+//        System.out.println("Site keys: " + elossPortfolio.getSiteKeys());
 
         // -------------------------
         // 3) Initialize ERF
@@ -87,7 +93,14 @@ public class PortfolioELossExample {
         }
 
         // -------------------------
-        // 5) Parallel hazard + ELoss computation
+        // 5) Progress tracking
+        // -------------------------
+        AtomicInteger counter = new AtomicInteger(0);
+        int total = sites.size();
+        long startTime = System.nanoTime();
+
+        // -------------------------
+        // 6) Parallel computation
         // -------------------------
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
@@ -122,9 +135,9 @@ public class PortfolioELossExample {
                         for (double x : imKey.getLogImValues()) {
                             hazFunc.set(x, 0d);
                         }
-                        
+
                         hazFunc = calc.getHazardCurve(hazFunc, site, gmm, erf);
-                        
+
                         double[] hazardY = new double[hazFunc.size()];
                         for (int j = 0; j < hazFunc.size(); j++) {
                             hazardY[j] = hazFunc.getY(j);
@@ -138,6 +151,28 @@ public class PortfolioELossExample {
                             );
                             double nEL = calcEL.compute();
                             asset.setnEL(nEL);
+                        }
+                    }
+
+                    // ---- Progress update ----
+                    int count = counter.incrementAndGet();
+
+                    if (count % 100 == 0 || count == total) {
+                        long now = System.nanoTime();
+                        double elapsedSec = (now - startTime) / 1e9;
+                        double rate = count / elapsedSec;
+                        double remaining = (total - count) / rate;
+
+                        synchronized (System.out) {
+                            System.out.printf(
+                                    "Processed %d / %d (%.1f%%) | %.1f sites/s | elapsed %.1fs | ETA %.1fs | site: %s%n",
+                                    count, total,
+                                    100.0 * count / total,
+                                    rate,
+                                    elapsedSec,
+                                    remaining,
+                                    siteKey
+                            );
                         }
                     }
 
@@ -156,5 +191,30 @@ public class PortfolioELossExample {
 
         System.out.println("ELoss computation complete.");
         elossPortfolio.printSummary();
+        
+        
+     // -------------------------
+     // 7) Save portfolio results to CSV
+     // -------------------------
+     try (java.io.PrintWriter pw = new java.io.PrintWriter(java.nio.file.Files.newBufferedWriter(outputCSV))) {
+         // Header
+         pw.print("AssetID,Latitude,Longitude,Value,Vulnerability");
+         // Optional extra columns (group) if you keep them
+         pw.println(",ExpectedLoss");
+
+         for (ELossAsset asset : elossPortfolio.getAssets()) {
+             pw.printf("%s,%.6f,%.6f,%.2f,%s,%.6e%n",
+                     asset.getAssetID(),
+                     asset.getSiteKey().getLat(),
+                     asset.getSiteKey().getLon(),
+                     asset.getValue(),
+                     asset.getVulnerabilityName(),
+                     asset.getExpectedLoss()
+             );
+         }
+         System.out.println("Portfolio results saved to " + outputCSV);
+     } catch (Exception e) {
+         e.printStackTrace();
+     }        
     }
 }

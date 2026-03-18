@@ -133,31 +133,31 @@ public class ELossPortfolio {
     // Aggregation / Summary
     // -----------------------
 
-    /** @return total estimated loss across all assets */
-    public double getTotalEstimatedLoss() {
+    /** @return total expected loss across all assets */
+    public double getTotalExpectedLoss() {
         return assets.stream()
-                .mapToDouble(ELossAsset::getEstimatedLoss)
+                .mapToDouble(ELossAsset::getExpectedLoss)
                 .sum();
     }
 
-    /** @return estimated loss aggregated by site */
-    public Map<ELossAsset.SiteKey, Double> getEstimatedLossBySite() {
+    /** @return expected loss aggregated by site */
+    public Map<ELossAsset.SiteKey, Double> getExpectedLossBySite() {
         Map<ELossAsset.SiteKey, Double> map = new LinkedHashMap<>();
         for (var e : assetsBySite.entrySet()) {
             double sum = e.getValue().stream()
-                    .mapToDouble(ELossAsset::getEstimatedLoss)
+                    .mapToDouble(ELossAsset::getExpectedLoss)
                     .sum();
             map.put(e.getKey(), sum);
         }
         return map;
     }
 
-    /** @return estimated loss aggregated by vulnerability name */
-    public Map<String, Double> getEstimatedLossByVulnerability() {
+    /** @return expected loss aggregated by vulnerability name */
+    public Map<String, Double> getExpectedLossByVulnerability() {
         Map<String, Double> map = new LinkedHashMap<>();
         for (ELossAsset asset : assets) {
             map.merge(asset.getVulnerabilityName(),
-                      asset.getEstimatedLoss(),
+                      asset.getExpectedLoss(),
                       Double::sum);
         }
         return map;
@@ -167,25 +167,25 @@ public class ELossPortfolio {
     public void printSummary() {
         System.out.println("----- ELossPortfolio Summary -----");
         System.out.printf("Total assets: %d%n", assets.size());
-        System.out.printf("Total estimated loss: %.2e%n", getTotalEstimatedLoss());
+        System.out.printf("Total expected loss: %.2e%n", getTotalExpectedLoss());
 
         System.out.println("Loss by site:");
-        getEstimatedLossBySite()
+        getExpectedLossBySite()
                 .forEach((k, v) -> System.out.printf("  %s -> %.2e%n", k, v));
 
         System.out.println("Loss by vulnerability:");
-        getEstimatedLossByVulnerability()
+        getExpectedLossByVulnerability()
                 .forEach((k, v) -> System.out.printf("  %s -> %.2e%n", k, v));
 
         System.out.println("Loss by individual asset:");
         for (ELossAsset asset : assets) {
             System.out.printf(
-                    "  AssetID=%s, Site=%s, Vulnerability=%s, Value=%.2e, EstimatedLoss=%.2e%n",
+                    "  AssetID=%s, Site=%s, Vulnerability=%s, Value=%.2e, ExpectedLoss=%.2e%n",
                     asset.getAssetID(),
                     asset.getSiteKey(),
                     asset.getVulnerabilityName(),
                     asset.getValue(),
-                    asset.getEstimatedLoss()
+                    asset.getExpectedLoss()
             );
         }
 

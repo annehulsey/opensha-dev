@@ -35,7 +35,7 @@ public class ELossPortfolioExample {
                 "date, author, workflow v1.0"
             );
         
-        // ---------- Step 3: Prepare for estimated loss calcs ----------
+        // ---------- Step 3: Prepare for expected loss calcs ----------
         ELossVulnerabilityLibrary elossVulnLib = ELossVulnerabilityPreparer.prepare(
                 library,
                 vulnNames,
