@@ -25,7 +25,7 @@ public class ELossVulnReaderExample {
             // ---------- Step 2: Define the portfolio ----------
             List<String> portfolioNames = Arrays.asList("W1-lowrise", "W2-midrise");
 
-            // ---------- Step 3: Prepare for estimated loss calcs ----------
+            // ---------- Step 3: Prepare for expected loss calcs ----------
             ELossVulnerabilityLibrary elossLib = ELossVulnerabilityPreparer.prepare(
                     library,
                     portfolioNames,

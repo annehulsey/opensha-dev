@@ -43,7 +43,7 @@ public class ELossPortfolioPreparer {
 
             // --- get vulnerability ---
             String vulnName = asset.getVulnModel();
-            System.out.println(vulnName);
+//            System.out.println(vulnName);
             ELossVulnerability vuln = vulnLibrary.getByName(vulnName);
 
             // --- build IM key for grouping ---

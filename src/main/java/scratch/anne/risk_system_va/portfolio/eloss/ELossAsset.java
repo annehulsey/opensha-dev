@@ -11,7 +11,7 @@ import scratch.anne.risk_system_va.calc.eloss.ELossVulnerability;
  * <p>
  * Each asset is associated with a site, an im group (IMT/x-values),
  * and a vulnerability model name. The asset is mutable for storing
- * estimated losses after hazard/loss calculations.
+ * expected losses after hazard/loss calculations.
  * </p>
  */
 public class ELossAsset {
@@ -31,7 +31,7 @@ public class ELossAsset {
     /** ID of the asset (copied from original Asset) */
     private final String assetID;
 
-    /** Mutable field to store the computed normalized estimated loss */
+    /** Mutable field to store the computed normalized expected loss */
     private double nEL;
 
     /**
@@ -68,7 +68,7 @@ public class ELossAsset {
         return value;
     }
 
-    public double getEstimatedLoss() {
+    public double getExpectedLoss() {
         return nEL * value;
     }
     
