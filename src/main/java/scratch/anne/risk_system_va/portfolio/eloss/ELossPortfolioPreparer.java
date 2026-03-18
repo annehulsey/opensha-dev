@@ -66,6 +66,7 @@ public class ELossPortfolioPreparer {
                     .add(elossAsset);
         }
 
-        return new ELossPortfolio(elossAssets, assetsBySite, assetsBySiteAndIm);
+//        return new ELossPortfolio(elossAssets, assetsBySite, assetsBySiteAndIm);
+        return new ELossPortfolio(elossAssets);
     }
 }
