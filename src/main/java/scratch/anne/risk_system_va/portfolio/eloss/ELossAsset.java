@@ -1,6 +1,9 @@
 package scratch.anne.risk_system_va.portfolio.eloss;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 import scratch.anne.risk_system_va.portfolio.Asset;
@@ -9,9 +12,9 @@ import scratch.anne.risk_system_va.calc.eloss.ELossVulnerability;
 /**
  * Represents an asset in an ELossPortfolio.
  * <p>
- * Each asset is associated with a site, an im group (IMT/x-values),
- * and a vulnerability model name. The asset is mutable for storing
- * expected losses after hazard/loss calculations.
+ * Each asset is associated with a site, an IMT/x-values group,
+ * a vulnerability model name, and dynamic extra grouping fields.
+ * This class is mutable only for storing the computed expected loss.
  * </p>
  */
 public class ELossAsset {
@@ -31,15 +34,17 @@ public class ELossAsset {
     /** ID of the asset (copied from original Asset) */
     private final String assetID;
 
-    /** Mutable field to store the computed normalized expected loss */
-    private double nEL;
+    /** Immutable map of extra CSV fields for dynamic grouping */
+    private final Map<String,String> extraGroupFields;
+
+    /** Mutable normalized expected loss (0–1) */
+    private double normalizedExpectedLoss;
 
     /**
      * Constructs a new ELossAsset directly from an Asset and a prepared vulnerability.
      *
      * @param asset the original Asset
-     * @param imt the IMT associated with the vulnerability
-     * @param logImValues the x-values associated with the vulnerability
+     * @param vuln  prepared ELossVulnerability
      */
     public ELossAsset(Asset asset, ELossVulnerability vuln) {
         this.siteKey = new SiteKey(asset.getLat(), asset.getLon(), asset.getVs30());
@@ -47,10 +52,63 @@ public class ELossAsset {
         this.vulnerabilityName = asset.getVulnModel();
         this.value = asset.getValue();
         this.assetID = asset.getAssetID();
-        this.nEL = Double.NaN;
+        this.extraGroupFields = Collections.unmodifiableMap(
+                new LinkedHashMap<>(asset.getExtraGroupFields())
+        );
+        this.normalizedExpectedLoss = Double.NaN;
+    }
+    
+    /**
+     * Constructs an ELossAsset directly from CSV-derived values.
+     *
+     * <p>This constructor is used when reloading an ELossPortfolio from a CSV file
+     * that already contains computed expected loss values. Unlike the standard
+     * constructor, it does not require an ELossVulnerability object.
+     *
+     * <p>The provided expected loss is converted back into normalized expected loss
+     * (nEL) using:
+     * <pre>
+     *     nEL = expectedLoss / value
+     * </pre>
+     *
+     * <p>An ImKey is still required for internal consistency but is not meaningful
+     * in this context, so a placeholder IMT ("UNKNOWN") and empty IM array are used.
+     *
+     * @param assetID unique asset identifier
+     * @param lat latitude
+     * @param lon longitude
+     * @param vs30 site Vs30 value
+     * @param value asset value
+     * @param vulnerabilityName vulnerability model name
+     * @param extraGroupFields additional grouping fields (may be empty but not null)
+     * @param expectedLoss precomputed expected loss for this asset
+     */
+    public ELossAsset(String assetID,
+                      double lat,
+                      double lon,
+                      double vs30,
+                      double value,
+                      String vulnerabilityName,
+                      Map<String,String> extraGroupFields,
+                      double expectedLoss) {
+
+        this.siteKey = new SiteKey(lat, lon, vs30);
+
+        // Placeholder IM key (not used in CSV rehydration context)
+        this.imKey = new ImKey("UNKNOWN", new double[0]);
+
+        this.vulnerabilityName = vulnerabilityName;
+        this.value = value;
+        this.assetID = assetID;
+
+        this.extraGroupFields = Collections.unmodifiableMap(
+                new LinkedHashMap<>(extraGroupFields)
+        );
+
+        this.normalizedExpectedLoss = (value == 0.0) ? 0.0 : expectedLoss / value;
     }
 
-    // --- Getters ---
+    // --- Getters and setters ---
 
     public SiteKey getSiteKey() {
         return siteKey;
@@ -68,20 +126,30 @@ public class ELossAsset {
         return value;
     }
 
+    /**
+     * Returns the computed expected loss (value * normalized expected loss).
+     */
     public double getExpectedLoss() {
-        return nEL * value;
-    }
-    
-    public double getnEL() {
-        return nEL;
+        return normalizedExpectedLoss * value;
     }
 
-    public void setnEL(double nEL) {
-        this.nEL = nEL;
+    public double getNormalizedExpectedLoss() {
+        return normalizedExpectedLoss;
+    }
+
+    public void setNormalizedExpectedLoss(double normalizedExpectedLoss) {
+        this.normalizedExpectedLoss = normalizedExpectedLoss;
     }
 
     public String getAssetID() {
         return assetID;
+    }
+
+    /**
+     * @return an unmodifiable map of extra CSV fields for dynamic grouping
+     */
+    public Map<String,String> getExtraGroupFields() {
+        return extraGroupFields;
     }
 
     // --- Inner classes ---
@@ -119,11 +187,7 @@ public class ELossAsset {
 
         @Override
         public String toString() {
-            return "SiteKey{" +
-                    "lat=" + latitude +
-                    ", lon=" + longitude +
-                    ", vs30=" + vs30 +
-                    '}';
+            return String.format("SiteKey[lat=%.5f, lon=%.5f, vs30=%.1f]", latitude, longitude, vs30);
         }
     }
 
@@ -157,10 +221,7 @@ public class ELossAsset {
 
         @Override
         public String toString() {
-            return "ImKey{" +
-                    "imt='" + imt + '\'' +
-                    ", xValues=" + Arrays.toString(logImValues) +
-                    '}';
+            return String.format("ImKey[imt=%s, xValues=%s]", imt, Arrays.toString(logImValues));
         }
     }
 }
