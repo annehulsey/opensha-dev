@@ -27,17 +27,28 @@ import scratch.anne.risk_system_va.vulnerabilities.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_va.portfolio.Portfolio;
 import scratch.anne.risk_system_va.portfolio.PortfolioReader;
 
-public class PortfolioELossExample {
+public class CalculatePortfolioELossExample {
 
     public static void main(String[] args) throws Exception {
 
-    	Path outputCSV = Paths.get("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs\\test0.csv");
+//    	String file_tag = "eLoss_p366_v0";
+    	String file_tag = "test1";
+    	String baseFolder = "C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs";
+    	String outputFileName = file_tag + ".csv";
+    	String aggregatedOutputFileName = file_tag + "_aggregated.csv";
+
+    	Path outputCSV = Paths.get(baseFolder, outputFileName);
+    	Path aggregatedOutputCSV = Paths.get(baseFolder, aggregatedOutputFileName);
         // -------------------------
         // 1) Read portfolio and vulnerability library
         // -------------------------
         Path portfolioPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\p366-portfolio_Porter-vuln-approximation_SHORT.csv");
         Path vulnLibraryPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\Porter_vulns_for_java.json");
 
+//        Path portfolioPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\portfolio.csv");
+//        Path vulnLibraryPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\vulnerabilities.json");
+
+        
         Portfolio portfolio = PortfolioReader.readCSV(portfolioPath);
         List<String> vulnNames = portfolio.getVulnerabilityNames();
 
@@ -150,7 +161,7 @@ public class PortfolioELossExample {
                                     IntegrationMethod.RIEMANN
                             );
                             double nEL = calcEL.compute();
-                            asset.setnEL(nEL);
+                            asset.setNormalizedExpectedLoss(nEL);
                         }
                     }
 
@@ -196,25 +207,11 @@ public class PortfolioELossExample {
      // -------------------------
      // 7) Save portfolio results to CSV
      // -------------------------
-     try (java.io.PrintWriter pw = new java.io.PrintWriter(java.nio.file.Files.newBufferedWriter(outputCSV))) {
-         // Header
-         pw.print("AssetID,Latitude,Longitude,Value,Vulnerability");
-         // Optional extra columns (group) if you keep them
-         pw.println(",ExpectedLoss");
-
-         for (ELossAsset asset : elossPortfolio.getAssets()) {
-             pw.printf("%s,%.6f,%.6f,%.2f,%s,%.6e%n",
-                     asset.getAssetID(),
-                     asset.getSiteKey().getLat(),
-                     asset.getSiteKey().getLon(),
-                     asset.getValue(),
-                     asset.getVulnerabilityName(),
-                     asset.getExpectedLoss()
-             );
-         }
-         System.out.println("Portfolio results saved to " + outputCSV);
-     } catch (Exception e) {
-         e.printStackTrace();
-     }        
+        elossPortfolio.writeCSV(outputCSV);   
+        System.out.println("ELoss .csv printed to: " + outputCSV);
+        System.out.println();
+        
+        elossPortfolio.writeAggregatedCSV(aggregatedOutputCSV);   
+        System.out.println("aggregatedELoss .csv printed to: " + aggregatedOutputCSV);
     }
 }
