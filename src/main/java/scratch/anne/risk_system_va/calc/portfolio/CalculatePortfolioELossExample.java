@@ -31,8 +31,8 @@ public class CalculatePortfolioELossExample {
 
     public static void main(String[] args) throws Exception {
 
-//    	String file_tag = "eLoss_p366_v0";
-    	String file_tag = "test1";
+    	String file_tag = "eLoss_p366_v0";
+//    	String file_tag = "test1";
     	String baseFolder = "C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs";
     	String outputFileName = file_tag + ".csv";
     	String aggregatedOutputFileName = file_tag + "_aggregated.csv";
@@ -42,7 +42,7 @@ public class CalculatePortfolioELossExample {
         // -------------------------
         // 1) Read portfolio and vulnerability library
         // -------------------------
-        Path portfolioPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\p366-portfolio_Porter-vuln-approximation_SHORT.csv");
+        Path portfolioPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\p366-portfolio_Porter-vuln-approximation.csv");
         Path vulnLibraryPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\Porter_vulns_for_java.json");
 
 //        Path portfolioPath = Paths.get("C:\\Users\\ahulsey\\git\\opensha-dev\\src\\main\\resources\\scratch\\anne\\risk_system_va\\portfolio.csv");
