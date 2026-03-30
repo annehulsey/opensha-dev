@@ -3,6 +3,7 @@ package scratch.anne.risk_system_vb.examples;
 import java.nio.file.*;
 import java.util.*;
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolio;
+import scratch.anne.risk_system_vb.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ImIndexedPortfolio;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityAsset;
@@ -22,9 +23,13 @@ public class ExpectedLossTopAssetsExample {
             Path vulnLibraryJSON = resourceFolder.resolve("Porter_vulns_for_java.json");
 
             // Load base portfolio
-            List<VulnerabilityAsset> basePortfolio = PortfolioReader.readCSV(vulnPortfolioCSV, VulnerabilityAsset.class).getAssets();
+            Portfolio<VulnerabilityAsset> basePortfolio =
+                    PortfolioReader.readCSV(vulnPortfolioCSV, VulnerabilityAsset.class);
             Set<String> assetModelNames = new HashSet<>();
-            for (VulnerabilityAsset a : basePortfolio) assetModelNames.addAll(a.getModelName());
+            for (VulnerabilityAsset a : basePortfolio.getAssets()) {
+                String modelName = a.getModelName(); // or whatever method gives the model name
+                if (modelName != null) assetModelNames.add(modelName);
+            }
 
             // Load vulnerability library
             ResponseModelLibrary<VulnerabilityModel> vulnLib = VulnerabilityLibraryReader.readLibrary(vulnLibraryJSON);
