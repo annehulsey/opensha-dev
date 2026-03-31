@@ -215,6 +215,12 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
         if (valueMap == null) return Collections.emptyList();
         return valueMap.getOrDefault(value, Collections.emptyList());
     }
+    
+    @Override
+    public Map<String, List<T>> getAdditionalFieldMap(String fieldName) {
+        Map<String, List<T>> map = additionalFieldGroups.get(fieldName);
+        return map != null ? Collections.unmodifiableMap(map) : Map.of();
+    }
 
     @Override
     public String toString() {

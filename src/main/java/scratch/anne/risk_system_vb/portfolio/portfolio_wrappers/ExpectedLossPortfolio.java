@@ -10,405 +10,280 @@ import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * Immutable Expected Loss portfolio wrapper.
+ * Immutable ExpectedLossPortfolio wrapper over an ImIndexedPortfolio of VulnerabilityAssets.
  *
- * <p>This class projects an {@link ImIndexedPortfolio} of
- * {@link VulnerabilityAsset}s into calculation-ready
- * {@link ExpectedLossAsset}s.
+ * <p>This class projects a full indexed portfolio into calculation-ready
+ * ExpectedLossAsset instances while preserving all structural metadata,
+ * indices, grouping maps, and ordering.</p>
  *
- * <h2>Design Philosophy</h2>
- *
- * <ul>
- *   <li>The underlying portfolio remains immutable.</li>
- *   <li>All metadata, indexing, and grouping are inherited —
- *       NEVER recomputed.</li>
- *   <li>Each asset receives a mutable calculation state
- *       (expected loss result).</li>
- *   <li>The portfolio structure itself is immutable and thread-safe.</li>
- * </ul>
- *
- * <p>The wrapper performs a <b>one-time projection</b>:
- *
- * <pre>
- * VulnerabilityAsset  →  ExpectedLossAsset
- * </pre>
- *
- * preserving all existing portfolio indices:
- *
- * <ul>
- *   <li>Asset ID</li>
- *   <li>SiteKey</li>
- *   <li>ImKey</li>
- *   <li>Dynamic additional grouping fields</li>
- * </ul>
- *
- * <h2>Threading Model</h2>
- *
- * <ul>
- *   <li>Portfolio structure is immutable.</li>
- *   <li>{@link ExpectedLossAsset} instances contain mutable
- *       calculation results.</li>
- *   <li>Assets can safely be processed in parallel provided
- *       each thread writes only to its assigned assets.</li>
- * </ul>
+ * <p>All underlying maps and lists from the base portfolio are reused; nothing is rebuilt
+ * except for projecting values into ExpectedLossAsset.</p>
  */
-public final class ExpectedLossPortfolio {
+public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> {
 
-    /* ======================================================
-                        BASE PORTFOLIO
-       ====================================================== */
+    /** Base Indexed Portfolio (wraps original Portfolio) */
+//    private final ImIndexedPortfolio<? extends VulnerabilityAsset> indexedBase;
 
-    private final ImIndexedPortfolio<? extends VulnerabilityAsset> base;
+    /** 1-to-1 mapping of VulnerabilityAsset → ExpectedLossAsset */
+    private final Map<VulnerabilityAsset, ExpectedLossAsset> elossMap;
 
-    /* ======================================================
-                        ASSET PROJECTION
-       ====================================================== */
-
-    private final Map<VulnerabilityAsset, ExpectedLossAsset> assetMap;
+    /** Cached ordered asset list */
     private final List<ExpectedLossAsset> assets;
 
-    /* ======================================================
-                        PROJECTED INDICES
-       ====================================================== */
-
+    /** Asset ID lookup */
     private final Map<String, ExpectedLossAsset> assetsByID;
+
+    /** Site-keyed lookup */
     private final Map<SiteKey, List<ExpectedLossAsset>> assetsBySite;
+
+    /** IM-keyed lookup */
     private final Map<ImKey, List<ExpectedLossAsset>> assetsByImKey;
 
-    private final Map<String,
-            Map<String, List<ExpectedLossAsset>>> assetsByAdditionalField;
+    /** Additional fields lookup */
+    private final Map<String, Map<String, List<ExpectedLossAsset>>> assetsByAdditionalField;
 
-    /* ======================================================
-                            CONSTRUCTOR
-       ====================================================== */
+    // ---------------------------------------------------------------------
+    // CONSTRUCTOR
+    // ---------------------------------------------------------------------
 
-    /**
-     * Constructs an ExpectedLossPortfolio by projecting an
-     * existing {@link ImIndexedPortfolio}.
-     *
-     * <p>No grouping or metadata is recomputed. All indices are
-     * derived directly from the base portfolio.
-     *
-     * @param basePortfolio indexed immutable portfolio
-     */
-    public ExpectedLossPortfolio(
-            ImIndexedPortfolio<? extends VulnerabilityAsset> basePortfolio) {
+    public ExpectedLossPortfolio(ImIndexedPortfolio<? extends VulnerabilityAsset> indexedBase) {
+//        this.indexedBase = Objects.requireNonNull(indexedBase);
 
-        this.base = Objects.requireNonNull(basePortfolio);
-
-        /* ---------- wrap assets ---------- */
-
-        Map<VulnerabilityAsset, ExpectedLossAsset> map = new HashMap<>();
-        List<ExpectedLossAsset> list = new ArrayList<>();
-
-        for (VulnerabilityAsset asset : base.getAssets()) {
-            ExpectedLossAsset e = new ExpectedLossAsset(asset);
-            map.put(asset, e);
-            list.add(e);
+        // ---------- 1-to-1 mapping ----------
+        Map<VulnerabilityAsset, ExpectedLossAsset> map = new LinkedHashMap<>();
+        List<ExpectedLossAsset> orderedList = new ArrayList<>();
+        for (VulnerabilityAsset a : indexedBase.getAssets()) {
+            ExpectedLossAsset e = new ExpectedLossAsset(a);
+            map.put(a, e);
+            orderedList.add(e);
         }
+        this.elossMap = Collections.unmodifiableMap(map);
+        this.assets = Collections.unmodifiableList(orderedList);
 
-        this.assetMap = Collections.unmodifiableMap(map);
-        this.assets = Collections.unmodifiableList(list);
-
-        /* ---------- ID index ---------- */
-
-        Map<String, ExpectedLossAsset> idMap = new HashMap<>();
-        for (ExpectedLossAsset a : assets) {
-            idMap.put(a.getAssetID(), a);
+        // ---------- asset ID ----------
+        Map<String, ExpectedLossAsset> idMap = new LinkedHashMap<>();
+        for (ExpectedLossAsset e : assets) {
+            idMap.put(e.getAssetID(), e);
         }
         this.assetsByID = Collections.unmodifiableMap(idMap);
 
-        /* ---------- SITE projection ---------- */
-
-        Map<SiteKey, List<ExpectedLossAsset>> siteMap = new HashMap<>();
-
-        for (SiteKey site : base.getSiteKeys()) {
-            List<ExpectedLossAsset> wrapped =
-                    base.getAssetsBySite(site)
-                            .stream()
-                            .map(assetMap::get)
-                            .toList();
-
-            siteMap.put(site, Collections.unmodifiableList(wrapped));
+        // ---------- SiteKey mapping ----------
+        Map<SiteKey, List<ExpectedLossAsset>> siteMap = new LinkedHashMap<>();
+        for (SiteKey s : indexedBase.getSiteKeys()) {
+            List<ExpectedLossAsset> wrapped = indexedBase.getAssetsBySite(s)
+                    .stream()
+                    .map(elossMap::get)
+                    .collect(Collectors.toList());
+            siteMap.put(s, Collections.unmodifiableList(wrapped));
         }
-
         this.assetsBySite = Collections.unmodifiableMap(siteMap);
 
-        /* ---------- IMKEY projection ---------- */
-
-        Map<ImKey, List<ExpectedLossAsset>> imMap = new HashMap<>();
-
-        for (ImKey key : base.getImKeys()) {
-
-            List<ExpectedLossAsset> wrapped =
-                    base.getAssetsByImKey(key)
-                            .stream()
-                            .map(assetMap::get)
-                            .toList();
-
-            imMap.put(key, Collections.unmodifiableList(wrapped));
+        // ---------- IMKey mapping ----------
+        Map<ImKey, List<ExpectedLossAsset>> imMap = new LinkedHashMap<>();
+        for (ImKey k : indexedBase.getImKeys()) {
+            List<ExpectedLossAsset> wrapped = indexedBase.getAssetsByImKey(k)
+                    .stream()
+                    .map(elossMap::get)
+                    .collect(Collectors.toList());
+            imMap.put(k, Collections.unmodifiableList(wrapped));
         }
-
         this.assetsByImKey = Collections.unmodifiableMap(imMap);
 
-        /* ---------- ADDITIONAL FIELD projection ---------- */
-
-        Map<String,
-                Map<String, List<ExpectedLossAsset>>> extra = new HashMap<>();
-
-        for (String field : base.getAdditionalFieldNames()) {
-
-            Map<String, List<ExpectedLossAsset>> valueMap =
-                    new HashMap<>();
-
-            for (String value :
-                    base.getAdditionalFieldValues(field)) {
-
-                List<ExpectedLossAsset> wrapped =
-                        base.getAssetsByAdditionalField(field, value)
-                                .stream()
-                                .map(assetMap::get)
-                                .toList();
-
-                valueMap.put(value,
-                        Collections.unmodifiableList(wrapped));
+        // ---------- Additional field mapping ----------
+        Map<String, Map<String, List<ExpectedLossAsset>>> extraMap = new LinkedHashMap<>();
+        for (String field : indexedBase.getAdditionalFieldNames()) {
+            Map<String, List<ExpectedLossAsset>> valueMap = new LinkedHashMap<>();
+            for (String val : indexedBase.getAdditionalFieldValues(field)) {
+                List<ExpectedLossAsset> wrapped = indexedBase.getAssetsByAdditionalField(field, val)
+                        .stream()
+                        .map(elossMap::get)
+                        .collect(Collectors.toList());
+                valueMap.put(val, Collections.unmodifiableList(wrapped));
             }
-
-            extra.put(field,
-                    Collections.unmodifiableMap(valueMap));
+            extraMap.put(field, Collections.unmodifiableMap(valueMap));
         }
-
-        this.assetsByAdditionalField =
-                Collections.unmodifiableMap(extra);
+        this.assetsByAdditionalField = Collections.unmodifiableMap(extraMap);
     }
 
-    /* ======================================================
-                          BASIC ACCESS
-       ====================================================== */
+    // ---------------------------------------------------------------------
+    // BASIC ASSET ACCESS
+    // ---------------------------------------------------------------------
 
-    /** @return all expected loss assets */
-    public List<ExpectedLossAsset> getAssets() {
-        return assets;
+    public List<ExpectedLossAsset> getAssets() { return assets; }
+
+    public ExpectedLossAsset getAssetByID(String id) { return assetsByID.get(id); }
+
+    public Set<SiteKey> getSiteKeys() { return assetsBySite.keySet(); }
+
+    public List<ExpectedLossAsset> getAssetsBySite(SiteKey s) {
+        return assetsBySite.getOrDefault(s, List.of());
     }
 
-    /** @return asset by unique ID */
-    public ExpectedLossAsset getAssetByID(String id) {
-        return assetsByID.get(id);
+    public Set<ImKey> getImKeys() { return assetsByImKey.keySet(); }
+
+    public List<ExpectedLossAsset> getAssetsByImKey(ImKey k) {
+        return assetsByImKey.getOrDefault(k, List.of());
     }
 
-    /** @return all SiteKeys present in portfolio */
-    public Set<SiteKey> getSiteKeys() {
-        return assetsBySite.keySet();
+    public Set<String> getAdditionalFieldNames() { return assetsByAdditionalField.keySet(); }
+
+    public Map<String, List<ExpectedLossAsset>> getAssetsByAdditionalField(String field) {
+        return assetsByAdditionalField.getOrDefault(field, Map.of());
     }
 
-    /** @return assets at a given site */
-    public List<ExpectedLossAsset> getAssetsBySite(SiteKey key) {
-        return assetsBySite.getOrDefault(key, List.of());
-    }
+    public int size() { return assets.size(); }
 
-    /** @return all IM keys */
-    public Set<ImKey> getImKeys() {
-        return assetsByImKey.keySet();
-    }
+    @Override
+    public Iterator<ExpectedLossAsset> iterator() { return assets.iterator(); }
 
-    /** @return assets sharing an IM key */
-    public List<ExpectedLossAsset> getAssetsByImKey(ImKey key) {
-        return assetsByImKey.getOrDefault(key, List.of());
-    }
+    /** Internal lookup from original asset */
+    ExpectedLossAsset get(VulnerabilityAsset a) { return elossMap.get(a); }
+    
+ // ---------------------------------------------------------------------
+ // AGGREGATED EXPECTED LOSS GETTERS
+ // ---------------------------------------------------------------------
 
-    /** @return names of dynamic grouping fields */
-    public Set<String> getAdditionalFieldNames() {
-        return assetsByAdditionalField.keySet();
-    }
+	 /** @return total expected loss of all assets */
+	 public double getTotalExpectedLoss() {
+	     return assets.stream()
+	             .mapToDouble(ExpectedLossAsset::getExpectedLoss)
+	             .sum();
+	 }
+	
+	 /** @return total asset value of all assets */
+	 public double getTotalAssetValue() {
+	     return assets.stream()
+	             .mapToDouble(ExpectedLossAsset::getValue)
+	             .sum();
+	 }
+	
+	 /** @return expected loss aggregated by SiteKey */
+	 public Map<SiteKey, Double> getExpectedLossBySite() {
+	     Map<SiteKey, Double> result = new LinkedHashMap<>();
+	     for (SiteKey s : getSiteKeys()) {
+	         double sum = getAssetsBySite(s).stream()
+	                 .mapToDouble(ExpectedLossAsset::getExpectedLoss)
+	                 .sum();
+	         result.put(s, sum);
+	     }
+	     return result;
+	 }
+	
+	 /** @return expected loss aggregated by IMKey */
+	 public Map<ImKey, Double> getExpectedLossByImKey() {
+	     Map<ImKey, Double> result = new LinkedHashMap<>();
+	     for (ImKey k : getImKeys()) {
+	         double sum = getAssetsByImKey(k).stream()
+	                 .mapToDouble(ExpectedLossAsset::getExpectedLoss)
+	                 .sum();
+	         result.put(k, sum);
+	     }
+	     return result;
+	 }
+	
+	 /** @return expected loss aggregated by vulnerability model */
+	 public Map<String, Double> getExpectedLossByVulnerability() {
+	     Map<String, Double> result = new LinkedHashMap<>();
+	     for (ExpectedLossAsset a : assets) {
+	         result.merge(a.getModelName(), a.getExpectedLoss(), Double::sum);
+	     }
+	     return result;
+	 }
+	
+	 /** @return expected loss aggregated by a dynamic additional field */
+	 public Map<String, Double> getExpectedLossByAdditionalField(String field) {
+	     Map<String, Double> result = new LinkedHashMap<>();
+	     Map<String, List<ExpectedLossAsset>> groups = getAssetsByAdditionalField(field);
+	     for (Map.Entry<String, List<ExpectedLossAsset>> e : groups.entrySet()) {
+	         double sum = e.getValue().stream()
+	                 .mapToDouble(ExpectedLossAsset::getExpectedLoss)
+	                 .sum();
+	         result.put(e.getKey(), sum);
+	     }
+	     return result;
+	 }
+	
+	 /** @return total asset value aggregated by a dynamic additional field */
+	 public Map<String, Double> getTotalValueByAdditionalField(String field) {
+	     Map<String, Double> result = new LinkedHashMap<>();
+	     Map<String, List<ExpectedLossAsset>> groups = getAssetsByAdditionalField(field);
+	     for (Map.Entry<String, List<ExpectedLossAsset>> e : groups.entrySet()) {
+	         double sum = e.getValue().stream()
+	                 .mapToDouble(ExpectedLossAsset::getValue)
+	                 .sum();
+	         result.put(e.getKey(), sum);
+	     }
+	     return result;
+	 }
+	
+	 /** @return summary statistics (min, max, avg, stddev) for a group of assets */
+	 public static Map<String, Double> summarizeExpectedLoss(List<ExpectedLossAsset> assets) {
+	     Map<String, Double> stats = new LinkedHashMap<>();
+	     int n = assets.size();
+	     if (n == 0) return stats;
+	
+	     double total = assets.stream().mapToDouble(ExpectedLossAsset::getExpectedLoss).sum();
+	     double avg = total / n;
+	     double min = assets.stream().mapToDouble(ExpectedLossAsset::getExpectedLoss).min().orElse(Double.NaN);
+	     double max = assets.stream().mapToDouble(ExpectedLossAsset::getExpectedLoss).max().orElse(Double.NaN);
+	     double variance = assets.stream().mapToDouble(a -> Math.pow(a.getExpectedLoss() - avg, 2)).sum() / n;
+	     double stdDev = Math.sqrt(variance);
+	
+	     stats.put("total", total);
+	     stats.put("avg", avg);
+	     stats.put("min", min);
+	     stats.put("max", max);
+	     stats.put("stdDev", stdDev);
+	     stats.put("n", (double)n);
+	
+	     return stats;
+	 }
 
-    /** @return grouping map for a dynamic field */
-    public Map<String, List<ExpectedLossAsset>>
-    getAssetsByAdditionalField(String field) {
+    // ---------------------------------------------------------------------
+    // CSV EXPORT
+    // ---------------------------------------------------------------------
 
-        return assetsByAdditionalField
-                .getOrDefault(field, Map.of());
-    }
-
-    /* ======================================================
-                          AGGREGATION
-       ====================================================== */
-
-    /** @return total expected loss */
-    public double getTotalExpectedLoss() {
-        double sum = 0.0;
-        for (ExpectedLossAsset a : assets)
-            sum += a.getExpectedLoss();
-        return sum;
-    }
-
-    /** @return expected loss aggregated by site */
-    public Map<SiteKey, Double> getExpectedLossBySite() {
-
-        Map<SiteKey, Double> result = new LinkedHashMap<>();
-
-        for (var e : assetsBySite.entrySet()) {
-
-            double sum = 0.0;
-            for (ExpectedLossAsset a : e.getValue())
-                sum += a.getExpectedLoss();
-
-            result.put(e.getKey(), sum);
-        }
-
-        return result;
-    }
-
-    /** @return expected loss aggregated by vulnerability model */
-    public Map<String, Double> getExpectedLossByVulnerability() {
-
-        Map<String, Double> result = new LinkedHashMap<>();
-
-        for (ExpectedLossAsset a : assets) {
-            result.merge(
-                    a.getModelName(),
-                    a.getExpectedLoss(),
-                    Double::sum);
-        }
-
-        return result;
-    }
-
-    /** Aggregation over any dynamic grouping field. */
-    public Map<String, Double>
-    getExpectedLossByAdditionalField(String field) {
-
-        Map<String, Double> result = new LinkedHashMap<>();
-
-        var groups = assetsByAdditionalField.get(field);
-        if (groups == null) return result;
-
-        for (var e : groups.entrySet()) {
-
-            double sum = 0.0;
-            for (ExpectedLossAsset a : e.getValue())
-                sum += a.getExpectedLoss();
-
-            result.put(e.getKey(), sum);
-        }
-
-        return result;
-    }
-
-    /* ======================================================
-                           CSV EXPORT
-       ====================================================== */
-
-    /**
-     * Writes full portfolio data to CSV.
-     *
-     * <p>Includes all dynamic grouping fields automatically.
-     */
     public void writeCSV(Path file) throws IOException {
-
-        try (PrintWriter pw =
-                     new PrintWriter(Files.newBufferedWriter(file))) {
-
-            pw.print(
-                    "AssetID,Latitude,Longitude,Vs30,Value,Vulnerability");
-
-            for (String field : getAdditionalFieldNames())
-                pw.print("," + field);
-
+        try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(file))) {
+            // Header
+            pw.print("AssetID,Latitude,Longitude,Vs30,Value,Vulnerability");
+            for (String field : getAdditionalFieldNames()) pw.print("," + field);
             pw.println(",ExpectedLoss");
 
             for (ExpectedLossAsset a : assets) {
-
                 pw.printf("\"%s\",%.6f,%.6f,%.0f,%.2f,\"%s\"",
-                        a.getAssetID(),
-                        a.getLatitude(),
-                        a.getLongitude(),
-                        a.getVs30(),
-                        a.getValue(),
-                        a.getModelName());
-
-                Map<String,String> extras =
-                        a.getAdditionalFields();
-
-                for (String field : getAdditionalFieldNames())
-                    pw.printf(",\"%s\"",
-                            extras.getOrDefault(field, ""));
-
+                        a.getAssetID(), a.getLatitude(), a.getLongitude(),
+                        a.getVs30(), a.getValue(), a.getModelName());
+                Map<String,String> extras = a.getAdditionalFields();
+                for (String f : getAdditionalFieldNames()) pw.printf(",\"%s\"", extras.getOrDefault(f,""));
                 pw.printf(",%.6e%n", a.getExpectedLoss());
             }
         }
     }
 
-    /* ======================================================
-                    AGGREGATED CSV EXPORT
-       ====================================================== */
-
-    /**
-     * Writes statistical summaries for every additional
-     * grouping field.
-     */
-    public void writeAggregatedCSV(Path outputPath)
-            throws IOException {
-
-        try (PrintWriter pw =
-                     new PrintWriter(Files.newBufferedWriter(outputPath))) {
-
-            pw.println(
-                "GroupField,GroupValue,NumAssets,TotalValue," +
-                "TotalExpectedLoss,AvgExpectedLoss," +
-                "MinExpectedLoss,MaxExpectedLoss,StdDevExpectedLoss");
-
+    public void writeAggregatedCSV(Path file) throws IOException {
+        try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(file))) {
+            pw.println("GroupField,GroupValue,NumAssets,TotalValue,TotalExpectedLoss," +
+                    "AvgExpectedLoss,MinExpectedLoss,MaxExpectedLoss,StdDevExpectedLoss");
             for (String field : getAdditionalFieldNames()) {
-
-                var grouped = assetsByAdditionalField.get(field);
-
-                for (var entry : grouped.entrySet()) {
-
-                    List<ExpectedLossAsset> list = entry.getValue();
-
-                    int n = list.size();
-
-                    double totalValue =
-                            list.stream()
-                                .mapToDouble(ExpectedLossAsset::getValue)
-                                .sum();
-
-                    double totalEL =
-                            list.stream()
-                                .mapToDouble(ExpectedLossAsset::getExpectedLoss)
-                                .sum();
-
-                    double avg = totalEL / n;
-
-                    double min =
-                            list.stream()
-                                .mapToDouble(ExpectedLossAsset::getExpectedLoss)
-                                .min().orElse(Double.NaN);
-
-                    double max =
-                            list.stream()
-                                .mapToDouble(ExpectedLossAsset::getExpectedLoss)
-                                .max().orElse(Double.NaN);
-
-                    double variance =
-                            list.stream()
-                                .mapToDouble(a ->
-                                    Math.pow(a.getExpectedLoss() - avg, 2))
-                                .sum() / n;
-
-                    double stdDev = Math.sqrt(variance);
+                Map<String,List<ExpectedLossAsset>> groups = getAssetsByAdditionalField(field);
+                for (Map.Entry<String, List<ExpectedLossAsset>> e : groups.entrySet()) {
+                    Map<String, Double> stats = summarizeExpectedLoss(e.getValue());
+                    double totalValue = e.getValue().stream().mapToDouble(ExpectedLossAsset::getValue).sum();
 
                     pw.printf("\"%s\",\"%s\",%d,%.2f,%.6e,%.6f,%.6f,%.6f,%.6f%n",
                             field,
-                            entry.getKey(),
-                            n,
+                            e.getKey(),
+                            stats.get("n").intValue(),
                             totalValue,
-                            totalEL,
-                            avg,
-                            min,
-                            max,
-                            stdDev);
+                            stats.get("total"),
+                            stats.get("avg"),
+                            stats.get("min"),
+                            stats.get("max"),
+                            stats.get("stdDev"));
                 }
             }
         }
