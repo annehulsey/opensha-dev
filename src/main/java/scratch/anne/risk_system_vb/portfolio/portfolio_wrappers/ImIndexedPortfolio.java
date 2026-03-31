@@ -151,6 +151,9 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
     public List<T> getAssetsByAdditionalField(String field, String value) { 
     	return base.getAssetsByAdditionalField(field, value) ;
     	}
+    
+    @Override
+    public Map<String, List<T>> getAdditionalFieldMap(String fieldName) {return base.getAdditionalFieldMap(fieldName); }
 
     @Override
     public String toString() {

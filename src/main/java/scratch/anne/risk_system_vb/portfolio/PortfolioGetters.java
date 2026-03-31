@@ -22,7 +22,9 @@ public interface PortfolioGetters<T extends AbstractAsset> {
     List<String> getAdditionalFieldNames();           		// additional fields in CSV or portfolio
     Set<String> getAdditionalFieldValues(String field);    // values of the field
     List<T> getAssetsByAdditionalField(String field, String value); // lookup by field value
+    Map<String, List<T>> getAdditionalFieldMap(String fieldName);
     
     Metadata getMetadata();                            // portfolio metadata
     int size();                                       // number of assets
+	
 }
