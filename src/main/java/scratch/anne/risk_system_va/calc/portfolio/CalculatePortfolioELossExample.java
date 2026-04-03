@@ -33,7 +33,7 @@ public class CalculatePortfolioELossExample {
 
     	String file_tag = "eLoss_p366_v0";
 //    	String file_tag = "test1";
-    	String baseFolder = "C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs";
+    	String baseFolder = "C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs\\_va";
     	String outputFileName = file_tag + ".csv";
     	String aggregatedOutputFileName = file_tag + "_aggregated.csv";
 

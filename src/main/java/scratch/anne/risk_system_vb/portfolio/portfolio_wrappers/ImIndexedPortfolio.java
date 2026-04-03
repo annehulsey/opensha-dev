@@ -23,6 +23,7 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
     private final PortfolioGetters<T> base;
     private final Map<T, ImKey> imKeyMap;
     private final Map<ImKey, List<T>> assetsByImKey;
+    private final Map<SiteKey, Map<ImKey, List<T>>> assetsBySiteAndImKey;
 
  // ---------------- Private Constructor --------------------
     private ImIndexedPortfolio(Portfolio<T> base, ExpectedVulnLibrary vulnLibrary) {
@@ -43,8 +44,8 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
             vulnNameToImKey.put(vulnName, key);
         }
 
-        Map<T, ImKey> tempMap = new HashMap<>();
         // Assign IMKeys to each asset based on matching vulnerability name
+        Map<T, ImKey> tempMap = new HashMap<>();
         for (T asset : base.getAssets()) {
             String assetModelName = asset.getModelName();
             ImKey imKey = vulnNameToImKey.get(assetModelName);
@@ -54,14 +55,13 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
             }
             tempMap.put(asset, imKey);
         }
+        this.imKeyMap = Collections.unmodifiableMap(tempMap);
 
         // Build the reverse map: IMKey → list of assets
         Map<ImKey, List<T>> imKeyGrouping = new HashMap<>();
         for (Map.Entry<T, ImKey> entry : tempMap.entrySet()) {
             imKeyGrouping.computeIfAbsent(entry.getValue(), k -> new ArrayList<>()).add(entry.getKey());
         }
-
-        // Make inner lists and outer map unmodifiable
         this.assetsByImKey = Collections.unmodifiableMap(
                 imKeyGrouping.entrySet().stream()
                         .collect(Collectors.toMap(
@@ -70,9 +70,26 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
                         ))
         );
 
-        // Make imKeyMap unmodifiable
-        this.imKeyMap = Collections.unmodifiableMap(tempMap);
-    }
+        // ---------------- Precompute site → IMKey → assets map --------------------
+        Map<SiteKey, Map<ImKey, List<T>>> siteImMap = new HashMap<>();
+        for (SiteKey site : base.getSiteKeys()) {
+            List<T> siteAssets = base.getAssetsBySite(site);
+            Map<ImKey, List<T>> imMap = new HashMap<>();
+            for (T asset : siteAssets) {
+                ImKey imKey = imKeyMap.get(asset);
+                imMap.computeIfAbsent(imKey, k -> new ArrayList<>()).add(asset);
+	            }
+	
+	            Map<ImKey, List<T>> unmodifiableImMap = imMap.entrySet().stream()
+	                    .collect(Collectors.toMap(
+	                            Map.Entry::getKey,
+	                            e -> Collections.unmodifiableList(e.getValue())
+	                    ));
+	
+	            siteImMap.put(site, Collections.unmodifiableMap(unmodifiableImMap));
+	        }
+	        this.assetsBySiteAndImKey = Collections.unmodifiableMap(siteImMap);
+    	}
 
     // ---------------- STATIC FACTORY ----------------
     public static <T extends AbstractAsset>
@@ -105,6 +122,12 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
     /** Get all assets that share a given IMKey */
     public List<T> getAssetsByImKey(ImKey key) {
         return assetsByImKey.getOrDefault(key, Collections.emptyList());
+    }
+    
+    /** Get all assets for a specific site and IMKey */
+    public List<T> getAssetsBySiteAndImKey(SiteKey site, ImKey imKey) {
+        Map<ImKey, List<T>> imMap = assetsBySiteAndImKey.getOrDefault(site, Collections.emptyMap());
+        return imMap.getOrDefault(imKey, Collections.emptyList());
     }
     
     // ------------------------------------------------------------------------

@@ -82,6 +82,24 @@ public final class AssetKeys {
 	    public String getImtString() { return imtString; }
 	    public ImDomain getDomain() { return domain; }
 	    public double[] getValues() { return values.clone(); }
+	    
+	    /**
+	     * Returns the IM values as log(IM), converting from linear if needed.
+	     */
+	    public double[] getLogValues() {
+	    	if (domain == ImDomain.LOG_IM ) {
+	    		return values;
+	    	}
+	    	else if (domain == ImDomain.LINEAR_IM) {
+	            double[] logValues = new double[values.length];
+	            for (int i = 0; i < values.length; i++) {
+	                logValues[i] = Math.log(values[i]);
+	            }
+	            return logValues;
+	        } else {
+	        	throw new IllegalArgumentException("Unknown ImDomain: " + domain);
+	        }
+	    }
 	
 	    @Override
 	    public boolean equals(Object o) {
