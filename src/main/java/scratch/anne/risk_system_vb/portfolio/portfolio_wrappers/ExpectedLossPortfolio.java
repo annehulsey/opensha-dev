@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> {
 
     /** Base Indexed Portfolio (wraps original Portfolio) */
-//    private final ImIndexedPortfolio<? extends VulnerabilityAsset> indexedBase;
+//    private final ImIndexedPortfolio<? extends VulnerabilityAsset> imIndexedPortfolio;
 
     /** 1-to-1 mapping of VulnerabilityAsset → ExpectedLossAsset */
     private final Map<VulnerabilityAsset, ExpectedLossAsset> elossMap;
@@ -41,21 +41,29 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
 
     /** IM-keyed lookup */
     private final Map<ImKey, List<ExpectedLossAsset>> assetsByImKey;
+    
+    /** Site IM-keyed lookup */
+    private final Map<SiteKey,Map<ImKey,List<ExpectedLossAsset>>> assetsBySiteAndImKey;
 
     /** Additional fields lookup */
     private final Map<String, Map<String, List<ExpectedLossAsset>>> assetsByAdditionalField;
+    
+    /** indicator for whether results are calculated */
+    private boolean expectedLossComputed;
 
     // ---------------------------------------------------------------------
     // CONSTRUCTOR
     // ---------------------------------------------------------------------
 
-    public ExpectedLossPortfolio(ImIndexedPortfolio<? extends VulnerabilityAsset> indexedBase) {
-//        this.indexedBase = Objects.requireNonNull(indexedBase);
+    public ExpectedLossPortfolio(ImIndexedPortfolio<? extends VulnerabilityAsset> indexedPortfolio) {
+//        this.imIndexedPortfolio = Objects.requireNonNull(indexedPortfolio);
+        
+        expectedLossComputed = false;
 
         // ---------- 1-to-1 mapping ----------
         Map<VulnerabilityAsset, ExpectedLossAsset> map = new LinkedHashMap<>();
         List<ExpectedLossAsset> orderedList = new ArrayList<>();
-        for (VulnerabilityAsset a : indexedBase.getAssets()) {
+        for (VulnerabilityAsset a : indexedPortfolio.getAssets()) {
             ExpectedLossAsset e = new ExpectedLossAsset(a);
             map.put(a, e);
             orderedList.add(e);
@@ -72,8 +80,8 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
 
         // ---------- SiteKey mapping ----------
         Map<SiteKey, List<ExpectedLossAsset>> siteMap = new LinkedHashMap<>();
-        for (SiteKey s : indexedBase.getSiteKeys()) {
-            List<ExpectedLossAsset> wrapped = indexedBase.getAssetsBySite(s)
+        for (SiteKey s : indexedPortfolio.getSiteKeys()) {
+            List<ExpectedLossAsset> wrapped = indexedPortfolio.getAssetsBySite(s)
                     .stream()
                     .map(elossMap::get)
                     .collect(Collectors.toList());
@@ -83,21 +91,49 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
 
         // ---------- IMKey mapping ----------
         Map<ImKey, List<ExpectedLossAsset>> imMap = new LinkedHashMap<>();
-        for (ImKey k : indexedBase.getImKeys()) {
-            List<ExpectedLossAsset> wrapped = indexedBase.getAssetsByImKey(k)
+        for (ImKey k : indexedPortfolio.getImKeys()) {
+            List<ExpectedLossAsset> wrapped = indexedPortfolio.getAssetsByImKey(k)
                     .stream()
                     .map(elossMap::get)
                     .collect(Collectors.toList());
             imMap.put(k, Collections.unmodifiableList(wrapped));
         }
         this.assetsByImKey = Collections.unmodifiableMap(imMap);
+        
+        // ---------- Site and ImKey mapping -------
+        Map<SiteKey, Map<ImKey, List<ExpectedLossAsset>>> siteImMap =
+                new LinkedHashMap<>();
+        for (SiteKey site : indexedPortfolio.getSiteKeys()) {
+            Map<ImKey, List<ExpectedLossAsset>> innerMap =
+                    new LinkedHashMap<>();
+            for (ImKey imKey : indexedPortfolio.getImKeys()) {
+                List<ExpectedLossAsset> wrapped =
+                        indexedPortfolio
+                                .getAssetsBySiteAndImKey(site, imKey)
+                                .stream()
+                                .map(elossMap::get)
+                                .collect(Collectors.toList());
+                if (!wrapped.isEmpty()) {
+                    innerMap.put(
+                            imKey,
+                            Collections.unmodifiableList(wrapped)
+                    );
+                }
+            }
+            siteImMap.put(
+                    site,
+                    Collections.unmodifiableMap(innerMap)
+            );
+        }
+        this.assetsBySiteAndImKey =
+                Collections.unmodifiableMap(siteImMap);   
 
         // ---------- Additional field mapping ----------
         Map<String, Map<String, List<ExpectedLossAsset>>> extraMap = new LinkedHashMap<>();
-        for (String field : indexedBase.getAdditionalFieldNames()) {
+        for (String field : indexedPortfolio.getAdditionalFieldNames()) {
             Map<String, List<ExpectedLossAsset>> valueMap = new LinkedHashMap<>();
-            for (String val : indexedBase.getAdditionalFieldValues(field)) {
-                List<ExpectedLossAsset> wrapped = indexedBase.getAssetsByAdditionalField(field, val)
+            for (String val : indexedPortfolio.getAdditionalFieldValues(field)) {
+                List<ExpectedLossAsset> wrapped = indexedPortfolio.getAssetsByAdditionalField(field, val)
                         .stream()
                         .map(elossMap::get)
                         .collect(Collectors.toList());
@@ -107,10 +143,39 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
         }
         this.assetsByAdditionalField = Collections.unmodifiableMap(extraMap);
     }
+    
+    /**
+     * Check if the portfolio has been updated with expected loss values.
+     */
+    public boolean isExpectedLossComputed() {
+        return expectedLossComputed;
+    }
+
+    /**
+     * Package-private setter, only the calculator should flip this.
+     */
+    public void setExpectedLossComputed(boolean computed) {
+        this.expectedLossComputed = computed;
+    }
 
     // ---------------------------------------------------------------------
     // BASIC ASSET ACCESS
     // ---------------------------------------------------------------------
+    
+    public List<ExpectedLossAsset> getAssetsBySiteAndImKey(
+            SiteKey site,
+            ImKey imKey) {
+
+        return assetsBySiteAndImKey
+                .getOrDefault(site, Collections.emptyMap())
+                .getOrDefault(imKey, Collections.emptyList());
+    }
+    
+    public Set<ImKey> getImKeysBySite(SiteKey site) {
+        return assetsBySiteAndImKey
+                .getOrDefault(site, Collections.emptyMap())
+                .keySet();
+    }
 
     public List<ExpectedLossAsset> getAssets() { return assets; }
 
@@ -218,6 +283,13 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
 	     }
 	     return result;
 	 }
+	 
+    /** Prints a summary of portfolio losses including per-asset detail. */
+    public void printSummary() {
+        System.out.println("----- ELossPortfolio Summary -----");
+        System.out.printf("Total assets: %d%n", assets.size());
+        System.out.printf("Total expected loss: %.2e%n", getTotalExpectedLoss());
+    }
 	
 	 /** @return summary statistics (min, max, avg, stddev) for a group of assets */
 	 public static Map<String, Double> summarizeExpectedLoss(List<ExpectedLossAsset> assets) {
@@ -241,7 +313,7 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
 	
 	     return stats;
 	 }
-
+	 
     // ---------------------------------------------------------------------
     // CSV EXPORT
     // ---------------------------------------------------------------------
