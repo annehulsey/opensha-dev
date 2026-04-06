@@ -39,7 +39,7 @@ public class PortfolioExpectedLossExample {
     	Path aggregatedOutputCSV = baseFolder.resolve(aggregatedOutputFileName);
 
         Path resourceFolder = Path.of("C:/Users/ahulsey/git/opensha-dev/src/main/resources/scratch/anne/risk_system_vb");
-        Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln-approximation_SHORT.csv");
+        Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln_SHORT.csv");
         Path vulnLibraryJSON = resourceFolder.resolve("Porter_vulns_for_java.json");
 
         // ---------- Step 1: Load vulnerability portfolio ----------

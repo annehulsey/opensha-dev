@@ -1,14 +1,16 @@
 package scratch.anne.risk_system_va.hazard;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Simple hazard curve reader.
+ * Simple hazard curve reader using GSON.
  * Defaults to ROEs and 1-yr timespan.
  */
 public class TestHazardCurveReader {
@@ -29,37 +31,31 @@ public class TestHazardCurveReader {
     /**
      * Constructor: read hazard JSON file with optional source/timespan.
      *
-     * @param path    Path to hazard JSON file
-     * @param source  "roes" or "poes"
+     * @param path     Path to hazard JSON file
+     * @param source   "roes" or "poes"
      * @param timespan Timespan key, e.g., "1-yr", "5-yr"
      * @throws IOException if reading file fails
      */
     public TestHazardCurveReader(Path path, String source, String timespan) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode root = mapper.readTree(Files.readString(path));
+        String jsonContent = Files.readString(path);
+        Gson gson = new Gson();
+
+        // Parse JSON as nested Map
+        Map<String, Object> root = gson.fromJson(jsonContent, new TypeToken<Map<String, Object>>() {}.getType());
 
         // Read IM levels
-        JsonNode imlsNode = root.get("imls");
-        imls = new double[imlsNode.size()];
-        for (int i = 0; i < imlsNode.size(); i++) {
-            imls[i] = imlsNode.get(i).asDouble();
-        }
+        List<Double> imlsList = gson.fromJson(gson.toJson(root.get("imls")), new TypeToken<List<Double>>() {}.getType());
+        if (imlsList == null) throw new IllegalArgumentException("IM levels 'imls' not found in JSON");
+        imls = imlsList.stream().mapToDouble(Double::doubleValue).toArray();
 
         // Read hazard values
-        JsonNode sourceNode = root.get(source);
-        if (sourceNode == null) {
-            throw new IllegalArgumentException("Source '" + source + "' not found in JSON");
-        }
+        Map<String, Object> sourceMap = gson.fromJson(gson.toJson(root.get(source)), new TypeToken<Map<String, Object>>() {}.getType());
+        if (sourceMap == null) throw new IllegalArgumentException("Source '" + source + "' not found in JSON");
 
-        JsonNode tsNode = sourceNode.get(timespan);
-        if (tsNode == null) {
-            throw new IllegalArgumentException("Timespan '" + timespan + "' not found in source '" + source + "'");
-        }
+        List<Double> hazardList = gson.fromJson(gson.toJson(sourceMap.get(timespan)), new TypeToken<List<Double>>() {}.getType());
+        if (hazardList == null) throw new IllegalArgumentException("Timespan '" + timespan + "' not found in source '" + source + "'");
 
-        hazardValues = new double[tsNode.size()];
-        for (int i = 0; i < tsNode.size(); i++) {
-            hazardValues[i] = tsNode.get(i).asDouble();
-        }
+        hazardValues = hazardList.stream().mapToDouble(Double::doubleValue).toArray();
 
         // Verify sizes
         if (hazardValues.length != imls.length) {
