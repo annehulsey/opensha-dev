@@ -10,7 +10,6 @@ import org.opensha.commons.param.Parameter;
 import org.opensha.commons.data.function.DiscretizedFunc;
 import org.opensha.commons.data.function.ArbitrarilyDiscretizedFunc;
 import org.opensha.sha.calc.HazardCurveCalculator;
-import org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_WUS_BranchAveragedERF;
 import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.imr.ScalarIMR;

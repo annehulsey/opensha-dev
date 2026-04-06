@@ -20,6 +20,7 @@ import scratch.anne.risk_system_vb.structural_response.vulnerabilities.Vulnerabi
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
+import scratch.anne.risk_system_vb.util.IO;
 
 /**
  * Fully dynamic CSV-driven Expected Loss Portfolio runner with input verification.
@@ -29,7 +30,7 @@ public class PortfolioExpectedLossCalcByCSV {
     public static void main(String[] args) throws Exception {
     	
     	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs\\_vb\\csv_inputs");
-    	Path inputFolder = Path.of("p366\\PorterVulns");
+    	Path inputFolder = Path.of("p366\\PorterVulns_ASK14");
 
         Path runFolder = baseFolder.resolve(inputFolder);
 
@@ -51,8 +52,8 @@ public class PortfolioExpectedLossCalcByCSV {
         Path vulnLibraryJSON = Path.of(config.get("vuln_library_json"));
 
         // ----------- VERIFY INPUT FILES EXIST -----------
-        verifyFileExists(portfolioCSV, "Portfolio CSV");
-        verifyFileExists(vulnLibraryJSON, "Vulnerability JSON");
+        IO.verifyFileExists(portfolioCSV, "Portfolio CSV");
+        IO.verifyFileExists(vulnLibraryJSON, "Vulnerability JSON");
 
         // ------------------- 3. Output paths inside run folder -------------------
         String fileTag = config.getOrDefault("file_tag", runFolder.getFileName().toString());
@@ -60,13 +61,29 @@ public class PortfolioExpectedLossCalcByCSV {
         Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated.csv");
 
         String erfClassName = config.get("erf_class");
-        String attenRelName = config.get("attenuation_relation");
+        String gmmName = config.get("gmm");
         String integrationMethod = config.getOrDefault("integration_method", "CLOSED_FORM");
-     // Read the logImStep, defaulting to NaN if not provided
+        // Read the logImStep, defaulting to NaN if not provided
         String logImStepStr = config.get("log_im_step");
         double logImStep = (logImStepStr == null || logImStepStr.isBlank())
                 ? Double.NaN
                 : Double.parseDouble(logImStepStr);
+        
+        // ------------ VERIFY ERF and GMM EXIST -------------------
+        try {
+            Class<?> erfClass = Class.forName(erfClassName);
+            if (!AbstractERF.class.isAssignableFrom(erfClass)) {
+                throw new IllegalArgumentException("Specified ERF class does not extend AbstractERF: " + erfClassName);
+            }
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("ERF class not found: " + erfClassName, e);
+        }
+        
+        try {
+            AttenRelRef.valueOf(gmmName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Attenuation relation not recognized: " + gmmName, e);
+        }
 
         // ------------------- 4. Load portfolio -------------------
         Portfolio<VulnerabilityAsset> basePortfolio =
@@ -101,8 +118,8 @@ public class PortfolioExpectedLossCalcByCSV {
         erf.updateForecast();
 
         // ------------------- 9. Dynamic attenuation relation -------------------
-        AttenRelRef attenRel =
-                AttenRelRef.valueOf(attenRelName.toUpperCase());
+        AttenRelRef gmm =
+                AttenRelRef.valueOf(gmmName.toUpperCase());
 
         // ------------------- 10. Create calculator -------------------
         RiskIntegral.IntegrationMethod integrationMethodEnum =
@@ -114,7 +131,7 @@ public class PortfolioExpectedLossCalcByCSV {
                 new ExpectedLossPortfolioCalculator(
                         elossPortfolio,
                         expVulnLib,
-                        attenRel,
+                        gmm,
                         erf,
                         integrationMethodEnum
                 );
@@ -151,10 +168,10 @@ public class PortfolioExpectedLossCalcByCSV {
         return map;
     }
 
-    // ------------------- Helper: Verify file exists -------------------
-    private static void verifyFileExists(Path path, String description) {
-        if (!Files.exists(path)) {
-            throw new IllegalArgumentException(description + " does not exist: " + path);
-        }
-    }
+//    // ------------------- Helper: Verify file exists -------------------
+//    private static void verifyFileExists(Path path, String description) {
+//        if (!Files.exists(path)) {
+//            throw new IllegalArgumentException(description + " does not exist: " + path);
+//        }
+//    }
 }
