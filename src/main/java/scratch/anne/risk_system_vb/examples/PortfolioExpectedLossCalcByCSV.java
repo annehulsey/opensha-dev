@@ -82,7 +82,7 @@ public class PortfolioExpectedLossCalcByCSV {
         try {
             AttenRelRef.valueOf(gmmName.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Attenuation relation not recognized: " + gmmName, e);
+            throw new IllegalArgumentException("GMM not recognized: " + gmmName, e);
         }
 
         // ------------------- 4. Load portfolio -------------------
