@@ -8,7 +8,7 @@ import scratch.anne.risk_system_vb.util.SimpleImResponseUtil;
  * Handles storing edges, computing midpoints, and IM values.
  * Concrete classes (vulnerability, fragility) extend this.
  */
-public abstract class AbstractSimpleImResponse implements SimpleImResponse {
+public abstract class AbstractSimpleImResponse implements SimpleImResponseInterface {
 
     protected final double[] imValues;
     protected final double[] logimValues;
@@ -40,5 +40,6 @@ public abstract class AbstractSimpleImResponse implements SimpleImResponse {
     @Override
     public double[] getImValues() { return imValues.clone(); }
     
+    @Override
     public double[] getLogImValues() { return logimValues.clone(); }
 }

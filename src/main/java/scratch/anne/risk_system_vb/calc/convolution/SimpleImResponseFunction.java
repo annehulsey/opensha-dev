@@ -6,7 +6,7 @@ import scratch.anne.risk_system_vb.util.enums.IMT;
 /**
  * Generic response function over IMs when name or IMT is irrelevant.
  *
- * <p>This class implements {@link SimpleImResponse} but returns null
+ * <p>This class implements {@link SimpleImResponseInterface} but returns null
  * for all {@link NamedResponseModel} getters.
  */
 public class SimpleImResponseFunction extends AbstractSimpleImResponse {
@@ -33,6 +33,11 @@ public class SimpleImResponseFunction extends AbstractSimpleImResponse {
     @Override
     public IMT getImt() {
         return null;
+    }
+    
+    @Override
+    public Double getPeriod() { 
+    	return null; 
     }
 
     @Override

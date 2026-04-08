@@ -1,13 +1,12 @@
-package scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected;
+package scratch.anne.risk_system_vb.structural_response;
 
 import scratch.anne.risk_system_vb.calc.convolution.AbstractSimpleImResponse;
-import scratch.anne.risk_system_vb.structural_response.NamedResponseModel;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.StringUtil;
 import scratch.anne.risk_system_vb.util.enums.IMT;
 
 /**
- * Represents a vulnerability that is prepared for normalized expected loss (nEL) calculations.
+ * Represents a discrete response function prepared for convolution.
  *
  * <p>This class extends {@link AbstractSimpleImResponse}, which provides the core
  * response data arrays used for risk convolution:
@@ -29,10 +28,10 @@ import scratch.anne.risk_system_vb.util.enums.IMT;
  *
  * @see AbstractSimpleImResponse
  */
-public class ExpectedVulnerability extends AbstractSimpleImResponse implements NamedResponseModel {
+public class SimpleImResponse extends AbstractSimpleImResponse implements NamedResponseModel {
 
     // ------------------------------------------------------------------------
-    // Metadata fields (encapsulated)
+    // Metadata
     // ------------------------------------------------------------------------
     private final String name;
     private final IMT imt;
@@ -43,7 +42,7 @@ public class ExpectedVulnerability extends AbstractSimpleImResponse implements N
     // ------------------------------------------------------------------------
     // Constructor: full control, specify IM domain
     // ------------------------------------------------------------------------
-    public ExpectedVulnerability(String name, IMT imt, Double period,
+    public SimpleImResponse(String name, IMT imt, Double period,
                                  double[] imValues, double[] damageRatioEdges,
                                  ImKey.ImDomain domain) {
         super(imValues, damageRatioEdges);
@@ -72,7 +71,7 @@ public class ExpectedVulnerability extends AbstractSimpleImResponse implements N
     // ------------------------------------------------------------------------
     // Convenience constructor: assume log-transformed IM values
     // ------------------------------------------------------------------------
-    public ExpectedVulnerability(String name, IMT imt, Double period,
+    public SimpleImResponse(String name, IMT imt, Double period,
                                  double[] imValues, double[] damageRatioEdges) {
         this(name, imt, period, imValues, damageRatioEdges, ImKey.ImDomain.LOG_IM);
     }
@@ -94,10 +93,34 @@ public class ExpectedVulnerability extends AbstractSimpleImResponse implements N
 
     @Override
     public String toString() {
-        return "ExpectedVulnerability{" +
+        return "SimpleImResponse{" +
                "name='" + name + '\'' +
                ", imt=" + imtString +
                ", nIM=" + imValues.length +
                '}';
+    }
+    
+    public String responseTable() {
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("Simple IM Response\n");
+        sb.append("------------------\n");
+        sb.append("Name : ").append(name).append("\n");
+        sb.append("IMT  : ").append(imtString).append("\n");
+        sb.append("N    : ").append(imValues.length).append("\n\n");
+
+        sb.append(String.format("%15s | %15s%n", "IM Value", "Response"));
+        sb.append("-----------------+-----------------\n");
+
+        for (int i = 0; i < imValues.length; i++) {
+            sb.append(String.format(
+                    "%15.6e | %15.6e%n",
+                    imValues[i],
+                    respEdges[i]
+            ));
+        }
+
+        return sb.toString();
     }
 }

@@ -1,9 +1,11 @@
 package scratch.anne.risk_system_vb.portfolio.portfolio_wrappers;
 
+import scratch.anne.risk_system_vb.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityAsset;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
+import scratch.anne.risk_system_vb.util.Metadata;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -22,7 +24,7 @@ import java.util.stream.Collectors;
  * <p>All underlying maps and lists from the base portfolio are reused; nothing is rebuilt
  * except for projecting values into ExpectedLossAsset.</p>
  */
-public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> {
+public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset>, PortfolioGetters<ExpectedLossAsset> {
 
     /** Base Indexed Portfolio (wraps original Portfolio) */
 //    private final ImIndexedPortfolio<? extends VulnerabilityAsset> imIndexedPortfolio;
@@ -50,6 +52,9 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
     
     /** indicator for whether results are calculated */
     private boolean expectedLossComputed;
+    
+    /** metadata */
+    private Metadata metadata;
 
     // ---------------------------------------------------------------------
     // CONSTRUCTOR
@@ -162,50 +167,112 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
     // BASIC ASSET ACCESS
     // ---------------------------------------------------------------------
     
-    public List<ExpectedLossAsset> getAssetsBySiteAndImKey(
-            SiteKey site,
-            ImKey imKey) {
+ // ---------------------------------------------------------------------
+ // PortfolioGetters IMPLEMENTATION
+ // ---------------------------------------------------------------------
 
-        return assetsBySiteAndImKey
-                .getOrDefault(site, Collections.emptyMap())
-                .getOrDefault(imKey, Collections.emptyList());
-    }
-    
-    public Set<ImKey> getImKeysBySite(SiteKey site) {
-        return assetsBySiteAndImKey
-                .getOrDefault(site, Collections.emptyMap())
-                .keySet();
-    }
-
-    public List<ExpectedLossAsset> getAssets() { return assets; }
-
-    public ExpectedLossAsset getAssetByID(String id) { return assetsByID.get(id); }
-
-    public Set<SiteKey> getSiteKeys() { return assetsBySite.keySet(); }
-
-    public List<ExpectedLossAsset> getAssetsBySite(SiteKey s) {
-        return assetsBySite.getOrDefault(s, List.of());
-    }
-
-    public Set<ImKey> getImKeys() { return assetsByImKey.keySet(); }
-
-    public List<ExpectedLossAsset> getAssetsByImKey(ImKey k) {
-        return assetsByImKey.getOrDefault(k, List.of());
-    }
-
-    public Set<String> getAdditionalFieldNames() { return assetsByAdditionalField.keySet(); }
-
-    public Map<String, List<ExpectedLossAsset>> getAssetsByAdditionalField(String field) {
-        return assetsByAdditionalField.getOrDefault(field, Map.of());
-    }
-
-    public int size() { return assets.size(); }
-
-    @Override
-    public Iterator<ExpectedLossAsset> iterator() { return assets.iterator(); }
-
-    /** Internal lookup from original asset */
-    ExpectedLossAsset get(VulnerabilityAsset a) { return elossMap.get(a); }
+	 @Override
+	 public List<ExpectedLossAsset> getAssets() {
+	     return assets;
+	 }
+	
+	 @Override
+	 public Set<String> getAssetIDs() {
+	     return assetsByID.keySet();
+	 }
+	
+	 @Override
+	 public ExpectedLossAsset getAssetByID(String assetID) {
+	     return assetsByID.get(assetID);
+	 }
+	
+	 @Override
+	 public int size() {
+	     return assets.size();
+	 }
+	
+	
+	 // ---------------- SITE ----------------
+	
+	 @Override
+	 public Map<SiteKey, List<ExpectedLossAsset>> getSiteMap() {
+	     return assetsBySite;
+	 }
+	
+	 @Override
+	 public Set<SiteKey> getSiteKeys() {
+	     return assetsBySite.keySet();
+	 }
+	
+	 @Override
+	 public List<ExpectedLossAsset> getAssetsBySite(SiteKey siteKey) {
+	     return assetsBySite.getOrDefault(siteKey, List.of());
+	 }
+	
+	 // ---------------- IM Key ------------------------
+	 
+	 public List<ExpectedLossAsset> getAssetsBySiteAndImKey( SiteKey site, ImKey imKey) { 
+		 return assetsBySiteAndImKey .getOrDefault(site, Collections.emptyMap()) .getOrDefault(imKey, Collections.emptyList()); } 
+	 
+	 public Set<ImKey> getImKeysBySite(SiteKey site) { 
+		 return assetsBySiteAndImKey .getOrDefault(site, Collections.emptyMap()) .keySet(); }	 
+	 
+	 public Set<ImKey> getImKeys() { return assetsByImKey.keySet(); } 
+	 
+	 public List<ExpectedLossAsset> getAssetsByImKey(ImKey k) { return assetsByImKey.getOrDefault(k, List.of()); }
+	 
+	
+	 // ---------------- RESPONSE MODELS ----------------
+	
+	 @Override
+	 public Set<String> getResponseModelNames() {
+	     return assets.stream()
+	             .map(ExpectedLossAsset::getModelName)
+	             .collect(Collectors.toCollection(LinkedHashSet::new));
+	 }
+	
+	
+	 // ---------------- ADDITIONAL FIELDS ----------------
+	
+	 @Override
+	 public List<String> getAdditionalFieldNames() {
+	     return List.copyOf(assetsByAdditionalField.keySet());
+	 }
+	
+	 @Override
+	 public Set<String> getAdditionalFieldValues(String field) {
+	     return assetsByAdditionalField
+	             .getOrDefault(field, Map.of())
+	             .keySet();
+	 }
+	
+	 @Override
+	 public List<ExpectedLossAsset> getAssetsByAdditionalField(String field, String value) {
+	     return assetsByAdditionalField
+	             .getOrDefault(field, Map.of())
+	             .getOrDefault(value, List.of());
+	 }
+	
+	 @Override
+	 public Map<String, List<ExpectedLossAsset>> getAdditionalFieldMap(String field) {
+	     return assetsByAdditionalField.getOrDefault(field, Map.of());
+	 }
+	
+	
+	 // ---------------- METADATA ----------------
+	
+	 @Override
+	 public Metadata getMetadata() {
+	     return this.metadata;
+	 }
+	
+	
+	 // ---------------- ITERABLE ----------------
+	
+	 @Override
+	 public Iterator<ExpectedLossAsset> iterator() {
+	     return assets.iterator();
+	 }
     
  // ---------------------------------------------------------------------
  // AGGREGATED EXPECTED LOSS GETTERS
@@ -257,24 +324,26 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
 	     }
 	     return result;
 	 }
-	
+	 
 	 /** @return expected loss aggregated by a dynamic additional field */
 	 public Map<String, Double> getExpectedLossByAdditionalField(String field) {
-	     Map<String, Double> result = new LinkedHashMap<>();
-	     Map<String, List<ExpectedLossAsset>> groups = getAssetsByAdditionalField(field);
-	     for (Map.Entry<String, List<ExpectedLossAsset>> e : groups.entrySet()) {
-	         double sum = e.getValue().stream()
-	                 .mapToDouble(ExpectedLossAsset::getExpectedLoss)
-	                 .sum();
-	         result.put(e.getKey(), sum);
-	     }
-	     return result;
-	 }
+		    Map<String, Double> result = new LinkedHashMap<>();
+		    Map<String, List<ExpectedLossAsset>> groups =
+		            getAdditionalFieldMap(field);
+		    for (Map.Entry<String, List<ExpectedLossAsset>> e : groups.entrySet()) {
+		        double sum = e.getValue().stream()
+		                .mapToDouble(ExpectedLossAsset::getExpectedLoss)
+		                .sum();
+		        result.put(e.getKey(), sum);
+		    }
+		    return result;
+		}
 	
 	 /** @return total asset value aggregated by a dynamic additional field */
 	 public Map<String, Double> getTotalValueByAdditionalField(String field) {
 	     Map<String, Double> result = new LinkedHashMap<>();
-	     Map<String, List<ExpectedLossAsset>> groups = getAssetsByAdditionalField(field);
+		    Map<String, List<ExpectedLossAsset>> groups =
+		            getAdditionalFieldMap(field);
 	     for (Map.Entry<String, List<ExpectedLossAsset>> e : groups.entrySet()) {
 	         double sum = e.getValue().stream()
 	                 .mapToDouble(ExpectedLossAsset::getValue)
@@ -341,7 +410,8 @@ public final class ExpectedLossPortfolio implements Iterable<ExpectedLossAsset> 
             pw.println("GroupField,GroupValue,NumAssets,TotalValue,TotalExpectedLoss," +
                     "AvgExpectedLoss,MinExpectedLoss,MaxExpectedLoss,StdDevExpectedLoss");
             for (String field : getAdditionalFieldNames()) {
-                Map<String,List<ExpectedLossAsset>> groups = getAssetsByAdditionalField(field);
+    		    Map<String, List<ExpectedLossAsset>> groups =
+    		            getAdditionalFieldMap(field);
                 for (Map.Entry<String, List<ExpectedLossAsset>> e : groups.entrySet()) {
                     Map<String, Double> stats = summarizeExpectedLoss(e.getValue());
                     double totalValue = e.getValue().stream().mapToDouble(ExpectedLossAsset::getValue).sum();

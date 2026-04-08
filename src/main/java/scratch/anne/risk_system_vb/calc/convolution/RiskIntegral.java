@@ -26,7 +26,7 @@ public class RiskIntegral {
 
     public enum IntegrationMethod { RIEMANN, CLOSED_FORM }
 
-    private final SimpleImResponse response;  // prepared response (includes imEdges, respEdges, respMid, etc.)
+    private final SimpleImResponseInterface response;  // prepared response (includes imEdges, respEdges, respMid, etc.)
     private double[] hazardValues;           // either rate or probability of exceedance, at response's imEdges
                                             // can also be null, if hazard will be supplied as .compute(hazard)
     private final IntegrationMethod method;
@@ -41,7 +41,7 @@ public class RiskIntegral {
      * @param hazardValue Hazard value (rate or probability of exceedance at vuln's imEdges)
      * @param method      Integration method (default: RIEMANN)
      */
-    public RiskIntegral(SimpleImResponse response, double[] hazard, IntegrationMethod method) {
+    public RiskIntegral(SimpleImResponseInterface response, double[] hazard, IntegrationMethod method) {
         if (hazard != null && response.getImValues().length != hazard.length) {
             throw new IllegalArgumentException("response IM and hazard array lengths must match");
         }
@@ -57,7 +57,7 @@ public class RiskIntegral {
      * @param response   SimpleImResponse
      * @param hazard     Hazard array
      */
-    public RiskIntegral(SimpleImResponse response, double[] hazard) {
+    public RiskIntegral(SimpleImResponseInterface response, double[] hazard) {
         this(response, hazard, null);
     }
 
@@ -70,7 +70,7 @@ public class RiskIntegral {
      * @param hazardFunc Hazard as DiscretizedFunc (x = IM, y = hazard value)
      * @param method     Integration method; if null, defaults to RIEMANN
      */
-    public RiskIntegral(SimpleImResponse response, DiscretizedFunc hazardFunc, IntegrationMethod method) {
+    public RiskIntegral(SimpleImResponseInterface response, DiscretizedFunc hazardFunc, IntegrationMethod method) {
         this.response = response;
         this.hazardValues = HazardFunctionUtil.convertHazFuncToArray(hazardFunc, response.getImValues());
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
@@ -83,7 +83,7 @@ public class RiskIntegral {
      * @param response   SimpleImResponse 
      * @param hazardFunc Hazard as DiscretizedFunc
      */
-    public RiskIntegral(SimpleImResponse response, DiscretizedFunc hazardFunc) {
+    public RiskIntegral(SimpleImResponseInterface response, DiscretizedFunc hazardFunc) {
         this(response, hazardFunc, null);
     }
 
@@ -125,7 +125,7 @@ public class RiskIntegral {
      * @param response   SimpleImResponse
      * @param method     Integration method; if null, defaults to RIEMANN
      */
-    public RiskIntegral(SimpleImResponse response, IntegrationMethod method) {
+    public RiskIntegral(SimpleImResponseInterface response, IntegrationMethod method) {
         this.response = response;
         this.hazardValues = null;
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
@@ -138,7 +138,7 @@ public class RiskIntegral {
      *
      * @param response SimpleImResponse
      */
-    public RiskIntegral(SimpleImResponse response) {
+    public RiskIntegral(SimpleImResponseInterface response) {
         this.response = response;
         this.hazardValues = null;
         this.method = null;

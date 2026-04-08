@@ -16,9 +16,9 @@ import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityA
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolio;
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ImIndexedPortfolio;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
+import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibraryPreparer;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 import scratch.anne.risk_system_vb.util.IO;
 
@@ -30,7 +30,8 @@ public class PortfolioExpectedLossCalcByCSV {
     public static void main(String[] args) throws Exception {
     	
     	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs\\_vb\\csv_inputs");
-    	Path inputFolder = Path.of("p366\\PorterVulns_ASK14");
+//    	Path inputFolder = Path.of("p366\\PorterVulns_ASK14");
+    	Path inputFolder = Path.of("tests\\short_portfolio");
 
         Path runFolder = baseFolder.resolve(inputFolder);
 
@@ -99,8 +100,8 @@ public class PortfolioExpectedLossCalcByCSV {
         ImValueTransformer transformer = Double.isNaN(logImStep)
                 ? new ImValueTransformer.NoImTransformation()
                 : new ImValueTransformer.LogInterpTransformation(logImStep);
-        ExpectedVulnLibrary expVulnLib =
-                ExpectedVulnLibraryPreparer.prepare(vulnLib, assetModelNames, transformer);
+        SimpleImResponseLibrary expVulnLib =
+                SimpleImVulnLibraryPreparer.prepare(vulnLib, assetModelNames, transformer);
 
         // ------------------- 7. Wrap portfolio with IMKey mapping -------------------
         ImIndexedPortfolio<VulnerabilityAsset> indexedPortfolio =
@@ -168,10 +169,4 @@ public class PortfolioExpectedLossCalcByCSV {
         return map;
     }
 
-//    // ------------------- Helper: Verify file exists -------------------
-//    private static void verifyFileExists(Path path, String description) {
-//        if (!Files.exists(path)) {
-//            throw new IllegalArgumentException(description + " does not exist: " + path);
-//        }
-//    }
 }

@@ -13,10 +13,13 @@ import scratch.anne.risk_system_vb.structural_response.NamedResponseModel;
  * implementation can optionally have a name, but must expose IM values
  * and response arrays.
  */
-public interface SimpleImResponse extends NamedResponseModel {
+public interface SimpleImResponseInterface extends NamedResponseModel {
 
     /** Intensity measure levels (IMs) that define the response bins */
     double[] getImValues();
+    
+    /** Log of IMs that define the response bins */
+    double[] getLogImValues();
 
     /** Response edges: per-IM values (fragility: P[D>ds], vulnerability: expected loss ratio) */
     double[] getRespEdges();

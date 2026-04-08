@@ -9,9 +9,9 @@ import scratch.anne.risk_system_vb.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityAsset;
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ImIndexedPortfolio;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
+import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibraryPreparer;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 
@@ -21,7 +21,7 @@ public class ImIndexedPortfolioExample {
         try {
         	
             Path resourceFolder = Path.of("C:/Users/ahulsey/git/opensha-dev/src/main/resources/scratch/anne/risk_system_vb");
-            Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln-approximation_SHORT.csv");
+            Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln_SHORT.csv");
             Path vulnLibraryJSON = resourceFolder.resolve("Porter_vulns_for_java.json");
             
 //            Path vulnPortfolioCSV = resourceFolder.resolve("portfolio.csv");
@@ -41,8 +41,8 @@ public class ImIndexedPortfolioExample {
             System.out.println("Basic vulnerability library loaded: " + vulnLib.size() + " items");
 
          // ---------- Step 3: Convert to ExpectedVuln library ----------
-            ExpectedVulnLibrary expVulnLib =
-                    ExpectedVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
+            SimpleImResponseLibrary expVulnLib =
+                    SimpleImVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
 
             System.out.println("Expected vulnerability library created: " + expVulnLib.size() + " items");
 

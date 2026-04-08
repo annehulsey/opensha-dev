@@ -5,10 +5,10 @@ import java.util.*;
 
 import scratch.anne.risk_system_vb.io.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponse;
+import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibraryPreparer;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnerability;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey.ImDomain;
 
@@ -40,38 +40,40 @@ public class ExpectedVulnLibraryReaderExample {
             	);
 
             // ---------- Step 3: Prepare ExpectedVulnerabilities ----------
-            ExpectedVulnLibrary expVulnLib =
-                    ExpectedVulnLibraryPreparer.prepare(
+            SimpleImResponseLibrary expVulnLib =
+                    SimpleImVulnLibraryPreparer.prepare(
                             modelLibrary,
                             new HashSet<>(portfolioVulnNames)
                     );
 
             System.out.println("\nExpectedVulnerabilityLibrary: " + expVulnLib);
+            System.out.println("\nExpectedVulnerabilityLibrary: " + expVulnLib.summary());
 
             // ---------- Step 4a: Print all vulnerabilities ----------
             System.out.println("\nAll Expected Vulnerabilities:");
-            for (ExpectedVulnerability ev : expVulnLib.getModels()) {
+            for (SimpleImResponse ev : expVulnLib.getModels()) {
                 System.out.println(ev);
+                System.out.println(ev.responseTable());
             }
 
             // ---------- Step 4b: Example lookup by IMKey ----------
-            ExpectedVulnerability example =
+            SimpleImResponse example =
                     expVulnLib.getModels().iterator().next();
 
             String imtStr = example.getImtString();
             double[] imValues = example.getImValues();
 
-            List<ExpectedVulnerability> grouped =
+            List<SimpleImResponse> grouped =
                     expVulnLib.getByImKey(new ImKey(imtStr, imValues, ImDomain.LOG_IM));
 
             System.out.println("\nVulnerabilities sharing IMKey with: " + example.getName());
-            for (ExpectedVulnerability ev : grouped) {
+            for (SimpleImResponse ev : grouped) {
                 System.out.println(" - " + ev.getName());
             }
 
             // ---------- Step 4c: Example lookup by name ----------
             String testName = portfolioVulnNames.get(0);
-            ExpectedVulnerability byName = expVulnLib.getByName(testName);
+            SimpleImResponse byName = expVulnLib.getByName(testName);
 
             System.out.println("\nLookup by name (" + testName + "):");
             System.out.println(byName);

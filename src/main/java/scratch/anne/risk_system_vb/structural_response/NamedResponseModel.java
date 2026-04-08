@@ -14,6 +14,9 @@ public interface NamedResponseModel {
     /** IMT object for this response */
     IMT getImt();
 
+    /** Get spectral period (null if IMT != SA) */
+    Double getPeriod();
+    
     /** String representation of IMT (e.g., "SA(1.0)") */
     String getImtString();
 

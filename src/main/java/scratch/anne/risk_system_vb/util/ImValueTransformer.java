@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 /**
  * Strategy interface for transforming intensity measure (IM) arrays and associated
- * response arrays in {@link ExpectedVulnerability} preparation.
+ * response arrays in {@link SimpleImResponseInterface} preparation.
  *
  * <p>This allows flexible interpolation, resampling, or other modifications of the
  * IM values before they are stored in a {@link SimpleImResponseLibrary}.

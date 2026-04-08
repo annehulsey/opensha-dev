@@ -3,8 +3,8 @@ package scratch.anne.risk_system_vb.portfolio.portfolio_wrappers;
 import scratch.anne.risk_system_vb.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.portfolio.assets.AbstractAsset;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnerability;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponse;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.Metadata;
@@ -26,32 +26,32 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
     private final Map<SiteKey, Map<ImKey, List<T>>> assetsBySiteAndImKey;
 
  // ---------------- Private Constructor --------------------
-    private ImIndexedPortfolio(Portfolio<T> base, ExpectedVulnLibrary vulnLibrary) {
+    private ImIndexedPortfolio(Portfolio<T> base, SimpleImResponseLibrary responseLibrary) {
         this.base = base;
 
-        // Build a mapping from vulnerability name → IMKey
-        Map<String, ImKey> vulnNameToImKey = new HashMap<>();
-        for (ExpectedVulnerability v : vulnLibrary.getModels()) {
-            ImKey key = v.getImKey();
-            String vulnName = v.getName();
-            if (vulnName == null || vulnName.isEmpty()) {
-                System.err.println("WARNING: Vulnerability has null/empty name, skipping: " + v);
+        // Build a mapping from response name → IMKey
+        Map<String, ImKey> responseNameToImKey = new HashMap<>();
+        for (SimpleImResponse r : responseLibrary.getModels()) {
+            ImKey key = r.getImKey();
+            String responseName = r.getName();
+            if (responseName == null || responseName.isEmpty()) {
+                System.err.println("WARNING: Response has null/empty name, skipping: " + r);
                 continue;
             }
-            if (vulnNameToImKey.containsKey(vulnName)) {
-                System.err.println("WARNING: Duplicate vulnerability name in library: " + vulnName);
+            if (responseNameToImKey.containsKey(responseName)) {
+                System.err.println("WARNING: Duplicate response name in library: " + responseName);
             }
-            vulnNameToImKey.put(vulnName, key);
+            responseNameToImKey.put(responseName, key);
         }
 
         // Assign IMKeys to each asset based on matching vulnerability name
         Map<T, ImKey> tempMap = new HashMap<>();
         for (T asset : base.getAssets()) {
             String assetModelName = asset.getModelName();
-            ImKey imKey = vulnNameToImKey.get(assetModelName);
+            ImKey imKey = responseNameToImKey.get(assetModelName);
             if (imKey == null) {
                 throw new IllegalArgumentException(
-                        "No IMKey found for asset ID: " + asset.getAssetID() + " / vulnName: " + assetModelName);
+                        "No IMKey found for asset ID: " + asset.getAssetID() + " / responseName: " + assetModelName);
             }
             tempMap.put(asset, imKey);
         }
@@ -95,9 +95,9 @@ public class ImIndexedPortfolio<T extends AbstractAsset> implements PortfolioGet
     public static <T extends AbstractAsset>
     ImIndexedPortfolio<T> of(
             Portfolio<T> portfolio,
-            ExpectedVulnLibrary vulnLibrary) {
+            SimpleImResponseLibrary responseLibrary) {
 
-        return new ImIndexedPortfolio<>(portfolio, vulnLibrary);
+        return new ImIndexedPortfolio<>(portfolio, responseLibrary);
     }
 
     // ------------------------------------------------------------------------
