@@ -17,7 +17,7 @@ import org.opensha.sha.imr.ScalarIMR;
 import scratch.anne.risk_system_vb.calc.convolution.RiskIntegral;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolio;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 
@@ -25,13 +25,13 @@ import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 public class ExpectedLossPortfolioCalculator {
 
     private final ExpectedLossPortfolio elossPortfolio;
-    private final ExpectedVulnLibrary vulnLib;
+    private final SimpleImResponseLibrary vulnLib;
     private final AttenRelRef gmmRef;
     private final AbstractERF erf;
     private final RiskIntegral.IntegrationMethod integrationMethod;
 
     public ExpectedLossPortfolioCalculator(ExpectedLossPortfolio elossPortfolio,
-		                                   ExpectedVulnLibrary elossVulnLib,
+    									   SimpleImResponseLibrary elossVulnLib,
 		                                   AttenRelRef gmmRef,
 		                                   AbstractERF erf,
 		                                   RiskIntegral.IntegrationMethod integrationMethod) {
@@ -48,7 +48,7 @@ public class ExpectedLossPortfolioCalculator {
      */
     public ExpectedLossPortfolioCalculator(
             ExpectedLossPortfolio elossPortfolio,
-            ExpectedVulnLibrary elossVulnLib,
+            SimpleImResponseLibrary elossVulnLib,
             AttenRelRef gmmRef,
             AbstractERF erf) {
 

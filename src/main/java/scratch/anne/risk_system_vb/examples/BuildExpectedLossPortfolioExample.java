@@ -10,18 +10,18 @@ import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityA
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ImIndexedPortfolio;
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolio;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
+import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibraryPreparer;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 
-public class ExpectedLossPortfolioExample {
+public class BuildExpectedLossPortfolioExample {
 
     public static void main(String[] args) {
         try {
             Path resourceFolder = Path.of("C:/Users/ahulsey/git/opensha-dev/src/main/resources/scratch/anne/risk_system_vb");
-            Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln-approximation_SHORT.csv");
+            Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln_SHORT.csv");
             Path vulnLibraryJSON = resourceFolder.resolve("Porter_vulns_for_java.json");
 
             // ---------- Step 1: Load vulnerability portfolio ----------
@@ -36,11 +36,12 @@ public class ExpectedLossPortfolioExample {
             System.out.println("Basic vulnerability library loaded: " + vulnLib.size() + " items");
 
             // ---------- Step 3: Convert to ExpectedVuln library ----------
-            ExpectedVulnLibrary expVulnLib =
-                    ExpectedVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
+            SimpleImResponseLibrary expVulnLib =
+                    SimpleImVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
             System.out.println("Expected vulnerability library created: " + expVulnLib.size() + " items");
 
             // ---------- Step 4: Wrap portfolio with IMKey mapping ----------
+       
             ImIndexedPortfolio<VulnerabilityAsset> indexedPortfolio =
                     ImIndexedPortfolio.of(basePortfolio, expVulnLib);
 
@@ -48,7 +49,8 @@ public class ExpectedLossPortfolioExample {
             ExpectedLossPortfolio expLossPortfolio = new ExpectedLossPortfolio(indexedPortfolio);
 
             System.out.println("ExpectedLossPortfolio created with " +
-                    expLossPortfolio.getAssets().size() + " assets");
+                    expLossPortfolio.getAssets().size() + " assets" +
+                    "with total value: " + expLossPortfolio.getTotalAssetValue());
 
             // ---------- Step 6: Inspect key groupings ----------
             for (ImKey imKey : indexedPortfolio.getImKeys()) {

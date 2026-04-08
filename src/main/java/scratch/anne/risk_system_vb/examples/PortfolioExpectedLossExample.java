@@ -15,9 +15,9 @@ import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityA
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolio;
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ImIndexedPortfolio;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
+import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibraryPreparer;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 
 
@@ -54,8 +54,8 @@ public class PortfolioExpectedLossExample {
         System.out.println("Basic vulnerability library loaded: " + vulnLib.size() + " items");
 
         // ---------- Step 3: Convert to ExpectedVuln library ----------
-        ExpectedVulnLibrary expVulnLib =
-                ExpectedVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
+        SimpleImResponseLibrary expVulnLib =
+                SimpleImVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
         double logImStep = 0.075;
 //        ExpectedVulnLibrary expVulnLib =
 //                ExpectedVulnLibraryPreparer.prepare(vulnLib, assetModelNames,new ImValueTransformer.LogInterpTransformation(logImStep));

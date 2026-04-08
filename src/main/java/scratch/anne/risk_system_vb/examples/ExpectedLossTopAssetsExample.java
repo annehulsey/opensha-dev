@@ -8,10 +8,10 @@ import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.ExpectedLossAs
 import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ImIndexedPortfolio;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityAsset;
 import scratch.anne.risk_system_vb.io.PortfolioReader;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.expected.ExpectedVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
+import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
+import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.io.VulnerabilityLibraryReader;
 
 public class ExpectedLossTopAssetsExample {
@@ -19,7 +19,7 @@ public class ExpectedLossTopAssetsExample {
     public static void main(String[] args) {
         try {
             Path resourceFolder = Path.of("C:/Users/ahulsey/git/opensha-dev/src/main/resources/scratch/anne/risk_system_vb");
-            Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln-approximation_SHORT.csv");
+            Path vulnPortfolioCSV = resourceFolder.resolve("p366-portfolio_Porter-vuln_SHORT.csv");
             Path vulnLibraryJSON = resourceFolder.resolve("Porter_vulns_for_java.json");
 
             // Load base portfolio
@@ -35,7 +35,7 @@ public class ExpectedLossTopAssetsExample {
             ResponseModelLibrary<VulnerabilityModel> vulnLib = VulnerabilityLibraryReader.readLibrary(vulnLibraryJSON);
 
             // Convert to ExpectedVuln library
-            ExpectedVulnLibrary expVulnLib = ExpectedVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
+            SimpleImResponseLibrary expVulnLib = SimpleImVulnLibraryPreparer.prepare(vulnLib, assetModelNames);
 
             // Wrap portfolio
             ImIndexedPortfolio<VulnerabilityAsset> indexedPortfolio = ImIndexedPortfolio.of(basePortfolio, expVulnLib);
