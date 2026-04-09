@@ -1,17 +1,19 @@
 package scratch.anne.risk_system_vb.util.enums;
 
-public enum DamageState {
+public enum LimitState {
 
     SLIGHT(LimitStateType.ORDERED),
     MODERATE(LimitStateType.ORDERED),
     EXTENSIVE(LimitStateType.ORDERED),
     COMPLETE(LimitStateType.ORDERED),
+    
+    COLLAPSE(LimitStateType.COMPETING), // separate failure mode
 
     TOPPLE(LimitStateType.COMPETING); // separate failure mode
 
     private final LimitStateType limitStateType;
 
-    DamageState(LimitStateType limitStateType) {
+    LimitState(LimitStateType limitStateType) {
         this.limitStateType = limitStateType;
     }
 
