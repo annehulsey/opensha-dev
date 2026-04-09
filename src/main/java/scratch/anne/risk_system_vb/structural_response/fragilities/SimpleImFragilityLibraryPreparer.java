@@ -3,7 +3,7 @@ package scratch.anne.risk_system_vb.structural_response.fragilities;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
 import scratch.anne.risk_system_vb.structural_response.SimpleImResponse;
 import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
-import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.DamageStateFragility;
+import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.LimitStateFragility;
 import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.DiscreteFragilityDefinition;
 import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.LognormalFragilityDefinition;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
@@ -63,16 +63,16 @@ public class SimpleImFragilityLibraryPreparer {
             String primaryDS,
             double[] customImValues) {
 
-        List<DamageStateFragility> dsList = model.getDamageStateFragilities();
+        List<LimitStateFragility> dsList = model.getLimitStateFragilities();
         if (dsList.isEmpty()) {
             throw new IllegalStateException("FragilityModel has no damage states: " + model.getName());
         }
 
         // Select primary damage state
-        DamageStateFragility selectedDS;
+        LimitStateFragility selectedDS;
         if (primaryDS != null) {
             selectedDS = dsList.stream()
-                    .filter(ds -> ds.getDamageState().equals(primaryDS))
+                    .filter(ds -> ds.getLimitState().name().equals(primaryDS))
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException(
                             "Primary DS not found in fragility model " + model.getName() + ": " + primaryDS));

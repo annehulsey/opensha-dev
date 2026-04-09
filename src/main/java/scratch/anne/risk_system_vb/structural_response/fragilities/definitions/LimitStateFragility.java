@@ -1,27 +1,27 @@
 package scratch.anne.risk_system_vb.structural_response.fragilities.definitions;
 
-import scratch.anne.risk_system_vb.util.enums.DamageState;
+import scratch.anne.risk_system_vb.util.enums.LimitState;
 
-public class DamageStateFragility {
+public class LimitStateFragility {
 
-    private final DamageState damageState;
+    private final LimitState limitState;
     private final FragilityDefinition definition;
 
-    public DamageStateFragility(DamageState damageState,
+    public LimitStateFragility(LimitState limitState,
                                 FragilityDefinition definition) {
 
-        if (damageState == null)
-            throw new IllegalArgumentException("Damage state required");
+        if (limitState == null)
+            throw new IllegalArgumentException("Limit state required");
 
         if (definition == null)
             throw new IllegalArgumentException("Definition cannot be null");
 
-        this.damageState = damageState;
+        this.limitState = limitState;
         this.definition = definition;
     }
 
-    public DamageState getDamageState() {
-        return damageState;
+    public LimitState getLimitState() {
+        return limitState;
     }
 
     public FragilityDefinition getDefinition() {
@@ -29,10 +29,10 @@ public class DamageStateFragility {
     }
 
     public boolean isOrdered() {
-        return damageState.isOrdered();
+        return limitState.isOrdered();
     }
 
     public boolean isCompeting() {
-        return damageState.isCompeting();
+        return limitState.isCompeting();
     }
 }

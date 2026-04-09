@@ -3,9 +3,10 @@ package scratch.anne.risk_system_vb.structural_response.fragilities;
 import java.util.List;
 
 import scratch.anne.risk_system_vb.structural_response.NamedResponseModel;
-import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.DamageStateFragility;
+import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.LimitStateFragility;
 import scratch.anne.risk_system_vb.util.StringUtil;
 import scratch.anne.risk_system_vb.util.enums.IMT;
+import scratch.anne.risk_system_vb.util.enums.LimitState;
 
 public class FragilityModel implements NamedResponseModel {
 
@@ -14,24 +15,40 @@ public class FragilityModel implements NamedResponseModel {
     private final Double period;
     private final String imtString;
 
-    private final List<DamageStateFragility> damageStates;
+    private final List<LimitStateFragility> limitStates;
+    private final LimitState primaryLs;
 
     public FragilityModel(
             String name,
             IMT imt,
             Double period,
-            List<DamageStateFragility> damageStates) {
+            List<LimitStateFragility> limitStates,
+            LimitState primaryLs) {
 
-        if (damageStates == null || damageStates.isEmpty())
-            throw new IllegalArgumentException("At least one damage state required");
+        if (limitStates == null || limitStates.isEmpty())
+            throw new IllegalArgumentException("At least one limit state required");
 
         this.name = name;
         this.imt = imt;
         this.period = period;
         this.imtString = StringUtil.imtToString(imt, period);
-        this.damageStates = List.copyOf(damageStates);
+        this.limitStates = List.copyOf(limitStates);
+        
+        if (primaryLs != null && limitStates.stream().noneMatch(ls -> ls.getLimitState() == primaryLs)) {
+            throw new IllegalArgumentException("Primary limit state must exist in lamageStates list");
+        }
+        this.primaryLs = primaryLs;
 
         validate();
+    }
+    
+    //* convenience constructor */
+    public FragilityModel(
+            String name,
+            IMT imt,
+            Double period,
+            List<LimitStateFragility> limitStates) {
+    	this(name, imt, period, limitStates, null);
     }
 
     private void validate() {
@@ -43,8 +60,28 @@ public class FragilityModel implements NamedResponseModel {
             throw new IllegalStateException("Only SA can have a period");
     }
 
-    public List<DamageStateFragility> getDamageStateFragilities() {
-        return damageStates;
+    public List<LimitStateFragility> getLimitStateFragilities() {
+        return limitStates;
+    }
+    
+    // Getter for primary limit state (nullable fallback to last LS)
+    public LimitStateFragility getPrimaryLimitState() {
+        if (primaryLs != null) {
+            return limitStates.stream()
+                    .filter(ls -> ls.getLimitState().equals(primaryLs))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Primary limit state not found"));
+        } else {
+            return limitStates.get(limitStates.size() - 1); // last limit state as fallback
+        }
+    }
+
+    // Getter for a specific limit state by name
+    public LimitStateFragility getLimitState(String lsName) {
+        return limitStates.stream()
+                .filter(ls -> ls.getLimitState().name().equals(lsName))
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
@@ -70,16 +107,17 @@ public class FragilityModel implements NamedResponseModel {
 
 	    sb.append("Fragility Model: ").append(name).append("\n");
 	    sb.append("IMT: ").append(imtString).append("\n");
-	    sb.append("Damage States:\n");
+	    sb.append("Primary LS: ").append(primaryLs).append("\n");
+	    sb.append("Limit States:\n");
 
-	    for (DamageStateFragility dsFrag : damageStates) {
+	    for (LimitStateFragility lsFrag : limitStates) {
 
 	        sb.append("\n");
-	        sb.append("  Damage State: ")
-	          .append(dsFrag.getDamageState())
+	        sb.append("  Limit State: ")
+	          .append(lsFrag.getLimitState())
 	          .append("\n");
 	        
-	        sb.append(dsFrag.getDefinition().toVerboseString());
+	        sb.append(lsFrag.getDefinition().toVerboseString());
 	    }
 	    return sb.toString();
 	}

@@ -1,11 +1,11 @@
 package scratch.anne.risk_system_vb.examples;
 
 import scratch.anne.risk_system_vb.structural_response.fragilities.*;
-import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.DamageStateFragility;
+import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.LimitStateFragility;
 import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.DiscreteFragilityDefinition;
 import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.FragilityDefinition;
 import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.LognormalFragilityDefinition;
-import scratch.anne.risk_system_vb.util.enums.DamageState;
+import scratch.anne.risk_system_vb.util.enums.LimitState;
 import scratch.anne.risk_system_vb.util.enums.IMT;
 
 import java.util.List;
@@ -22,22 +22,22 @@ public final class FragilityModelExample {
 
     public static FragilityModel buildExampleModel() {
 
-        List<DamageStateFragility> damageStates = List.of(
-                new DamageStateFragility(
-                        DamageState.SLIGHT,
+        List<LimitStateFragility> limitStates = List.of(
+                new LimitStateFragility(
+                        LimitState.SLIGHT,
                         slightFragility()),
 
-                new DamageStateFragility(
-                        DamageState.MODERATE,
+                new LimitStateFragility(
+                        LimitState.MODERATE,
                         moderateFragility()),
 
-                new DamageStateFragility(
-                        DamageState.COMPLETE,
+                new LimitStateFragility(
+                        LimitState.COMPLETE,
                         completeFragility()),
 
                 // competing state
-                new DamageStateFragility(
-                        DamageState.TOPPLE,
+                new LimitStateFragility(
+                        LimitState.TOPPLE,
                         toppleFragility())
         );
 
@@ -45,7 +45,7 @@ public final class FragilityModelExample {
                 "ExampleBuilding",
                 IMT.SA,
                 0.5,
-                damageStates
+                limitStates
         );
     }
 
@@ -87,9 +87,9 @@ public final class FragilityModelExample {
 
         System.out.println("Fragility model: " + model.getName());
 
-        model.getDamageStateFragilities().forEach(ds ->
+        model.getLimitStateFragilities().forEach(ds ->
                 System.out.println(
-                        ds.getDamageState()
+                        ds.getLimitState()
                                 + " -> "
                                 + ds.getDefinition().getClass().getSimpleName()));
         
