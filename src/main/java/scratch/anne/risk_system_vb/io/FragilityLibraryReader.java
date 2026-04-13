@@ -111,8 +111,7 @@ public class FragilityLibraryReader {
             try {
                 primaryLS = LimitState.valueOf(lsStr.toUpperCase());
             } catch (IllegalArgumentException e) {
-                System.err.println("Invalid primary LimitState for component " + compID + ": " + lsStr);
-                throw e;             
+                throw new IllegalArgumentException("Invalid primary LimitState for component " + compID + ": " + lsStr);
             }
         }
         
@@ -124,8 +123,7 @@ public class FragilityLibraryReader {
             imt = imtPeriod.imt;
             period = imtPeriod.period;        	
         } catch (IllegalArgumentException e) {
-            System.err.println("Invalid imt for component " + compID + ": " + imtStr);
-            throw e;
+            throw new IllegalArgumentException("Invalid primary LimitState for component " + compID + ": " + imtStr);
         }
         
         JsonObject limitStatesNode = compNode.getAsJsonObject("limitStates");
@@ -140,8 +138,7 @@ public class FragilityLibraryReader {
             try {
                 ls = LimitState.valueOf(lsName.toUpperCase());
             } catch (IllegalArgumentException e) {
-                System.err.println("Invalid LimitState for component " + compID + ": " + lsName);
-                throw e;
+            	throw new IllegalArgumentException("Invalid LimitState for component " + compID + ": " + lsName);
             }
 
             FragilityDefinition def;
@@ -229,9 +226,7 @@ public class FragilityLibraryReader {
                     .collect(Collectors.toSet());
 
             if (primaryValues.size() > 1) {
-            	System.err.println("Multiple primaryLS for component " + compID + ": ");
-            throw new IllegalArgumentException(
-                    "Multiple primaryLS for component " + compID + ": " + primaryValues);
+            	throw new IllegalArgumentException("Multiple primaryLS for component " + compID + ": " + primaryValues);
             }
 
 
@@ -241,10 +236,8 @@ public class FragilityLibraryReader {
                 try {
                     primaryLS = LimitState.valueOf(primaryStr.toUpperCase());
                 } catch (IllegalArgumentException e) {
-                    System.err.println(
-                            "Invalid primary LimitState for component "
-                                    + compID + ": " + primaryStr);
-                    throw e;
+                	throw new IllegalArgumentException("Invalid primary LimitState for component "
+                            + compID + ": " + primaryStr);
                 }
             }
 
@@ -259,8 +252,6 @@ public class FragilityLibraryReader {
 
             
             if (imtValues.size() != 1) {
-            	System.err.println("Component " + compID +
-                        " must define exactly one IMT, found: " + imtValues);
                 throw new IllegalArgumentException(
                         "Component " + compID +
                         " must define exactly one IMT, found: " + imtValues);
@@ -279,10 +270,9 @@ public class FragilityLibraryReader {
                 period = imtPeriod.period;
 
             } catch (IllegalArgumentException e) {
-                System.err.println(
-                        "Invalid imt for component "
+                throw new IllegalArgumentException(
+                		"Invalid imt for component "
                                 + compID + ": " + imtStr);
-                throw e;
             }
 
             /* --------------------------------------------------------
@@ -306,10 +296,8 @@ public class FragilityLibraryReader {
                 try {
                     ls = LimitState.valueOf(lsName.toUpperCase());
                 } catch (IllegalArgumentException e) {
-                    System.err.println(
-                            "Invalid LimitState for component "
-                                    + compID + ": " + lsName);
-                    throw e;
+                	throw new IllegalArgumentException("Invalid LimitState for component "
+                            + compID + ": " + lsName);
                 }
 
                 String type = lsRows.get(0)[4].toLowerCase();
