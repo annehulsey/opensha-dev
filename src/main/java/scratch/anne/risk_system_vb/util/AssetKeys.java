@@ -3,6 +3,8 @@ package scratch.anne.risk_system_vb.util;
 import java.util.Arrays;
 import java.util.Objects;
 
+import scratch.anne.risk_system_vb.util.StringUtil.ImtPeriod;
+
 /**
  * Utility keys for grouping assets by location and intensity measure.
  * <p>
@@ -83,6 +85,8 @@ public final class AssetKeys {
 	    public ImDomain getDomain() { return domain; }
 	    public double[] getValues() { return values.clone(); }
 	    
+	    public ImtPeriod getImtPeriod() { return StringUtil.stringToImtPeriod(imtString); }
+	    
 	    /**
 	     * Returns the IM values as log(IM), converting from linear if needed.
 	     */
@@ -100,6 +104,24 @@ public final class AssetKeys {
 	        	throw new IllegalArgumentException("Unknown ImDomain: " + domain);
 	        }
 	    }
+	    
+	    /**
+	     * Returns the IM values as linear(IM), converting from log if needed.
+	     */
+	    public double[] getLinearValues() {
+	    	if (domain == ImDomain.LINEAR_IM ) {
+	    		return values;
+	    	}
+	    	else if (domain == ImDomain.LOG_IM) {
+	            double[] linearValues = new double[values.length];
+	            for (int i = 0; i < values.length; i++) {
+	                linearValues[i] = Math.exp(values[i]);
+	            }
+	            return linearValues;
+	        } else {
+	        	throw new IllegalArgumentException("Unknown ImDomain: " + domain);
+	        }
+	    }	    
 	
 	    @Override
 	    public boolean equals(Object o) {

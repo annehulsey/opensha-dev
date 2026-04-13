@@ -1,7 +1,5 @@
 package scratch.anne.risk_system_vb.util;
 
-import java.util.Arrays;
-
 /**
  * Strategy interface for transforming intensity measure (IM) arrays and associated
  * response arrays in {@link SimpleImResponseInterface} preparation.
@@ -55,14 +53,14 @@ public interface ImValueTransformer {
      */
     class LogInterpTransformation implements ImValueTransformer {
 
-        private final double deltaLog10; // spacing in log10(IM)
+        private final double logStep; // spacing in log10(IM)
 
         /**
-         * @param deltaLog10 spacing in log10(IM), e.g., 0.025 gives ~90 bins per decade
+         * @param logStep spacing in log10(IM), e.g., 0.025 gives ~90 bins per decade
          */
-        public LogInterpTransformation(double deltaLog10) {
-            if (deltaLog10 <= 0) throw new IllegalArgumentException("deltaLog10 must be positive");
-            this.deltaLog10 = deltaLog10;
+        public LogInterpTransformation(double logStep) {
+            if (logStep <= 0) throw new IllegalArgumentException("deltaLog10 must be positive");
+            this.logStep = logStep;
         }
 
         /**
@@ -78,58 +76,89 @@ public interface ImValueTransformer {
             if (imValues.length != respValues.length) {
                 throw new IllegalArgumentException("IM and response arrays must have same length");
             }
-            int nOriginal = imValues.length;
-            double imMin = imValues[0];
-            double imMax = imValues[nOriginal - 1];
+            double[] newIM = NumericUtil.distributeLogSpacedValues(
+                    imValues[0],
+                    imValues[imValues.length - 1],
+                    logStep
+            );
 
-            // Compute number of bins
-            int nBins = (int) Math.ceil(Math.log10(imMax / imMin) / deltaLog10);
+            double[] newResp = new double[newIM.length];
 
-            double[] logIMGrid = new double[nBins + 1];
-            double[] respGrid = new double[nBins + 1];
-
-            // Fill log-spaced IM values
-            for (int i = 0; i <= nBins; i++) {
-                logIMGrid[i] = imMin * Math.pow(10, i * deltaLog10);
+            for (int i = 0; i < newIM.length; i++) {
+                newResp[i] = NumericUtil.linearInterpolate(
+                        imValues,
+                        respValues,
+                        newIM[i]
+                );
             }
-            logIMGrid[nBins] = imMax; // ensure exact max
 
-            // Linear interpolation of response values
-            for (int i = 0; i <= nBins; i++) {
-                double im = logIMGrid[i];
-                int idx = Arrays.binarySearch(imValues, im);
+            return new Result(newIM, newResp);
+        }
+    }
+    
 
-                if (idx >= 0) {
-                    respGrid[i] = respValues[idx]; // exact match
-                } else {
-                    int insert = -idx - 1;
-                    if (insert == 0) {
-                        respGrid[i] = respValues[0]; // extrapolate below
-                    } else if (insert >= nOriginal) {
-                        respGrid[i] = respValues[nOriginal - 1]; // extrapolate above
-                    } else {
-                        double x0 = imValues[insert - 1];
-                        double x1 = imValues[insert];
-                        double y0 = respValues[insert - 1];
-                        double y1 = respValues[insert];
-                        respGrid[i] = y0 + (y1 - y0) * (im - x0) / (x1 - x0);
-                    }
+    /**
+     * Transformer that resamples IM and response arrays onto a log-spaced IM grid.
+     * Linear interpolation is used for the response values.
+     */
+    class CustomImTransformation implements ImValueTransformer {
+    	
+    	private final double [] customImValues;
+    
+    	
+        public CustomImTransformation(double [] customImValues) {
+            if (customImValues == null || customImValues.length == 0) {
+                throw new IllegalArgumentException("customImValues cannot be null or empty");
+            }
+
+            for (int i = 0; i < customImValues.length; i++) {
+
+                double v = customImValues[i];
+
+                if (Double.isNaN(v) || Double.isInfinite(v)) {
+                    throw new IllegalArgumentException(
+                            "customImValues contains invalid number at index " + i);
+                }
+
+                if (i > 0 && customImValues[i] <= customImValues[i - 1]) {
+                    throw new IllegalArgumentException(
+                            "customImValues must be strictly increasing. " +
+                            "Violation at index " + i +
+                            ": " + customImValues[i - 1] + " >= " + customImValues[i]);
                 }
             }
 
-            return new Result(logIMGrid, respGrid);
-        }
-    }
+            this.customImValues = customImValues.clone();
 
-    /**
-     * Placeholder transformer for future resampling logic.
-     * Currently behaves as identity.
-     */
-    class PlaceholderImTransformation implements ImValueTransformer {
-        @Override
-        public Result transform(double[] imValues, double[] respValues) {
-            // TODO: implement optional interpolation (logspace, linspace, fixed points, etc.)
-            return new Result(imValues.clone(), respValues.clone());
         }
-    }
+    	@Override
+	    public Result transform(double[] imValues, double[] respValues) {
+	
+	        double[] newIM = customImValues.clone();
+	        double[] newResp = new double[newIM.length];
+	
+	        for (int i = 0; i < newIM.length; i++) {
+	            newResp[i] = NumericUtil.linearInterpolate(
+	                    imValues,
+	                    respValues,
+	                    newIM[i]
+	            );
+	        }
+	
+	        return new Result(newIM, newResp);
+	    }
+	
+	    /**
+	     * Placeholder transformer for future resampling logic.
+	     * Currently behaves as identity.
+	     */
+	    class PlaceholderImTransformation implements ImValueTransformer {
+	        @Override
+	        public Result transform(double[] imValues, double[] respValues) {
+	            // TODO: implement optional interpolation (logspace, linspace, fixed points, etc.)
+	            return new Result(imValues.clone(), respValues.clone());
+	        }
+	    }
+	}
 }
+    
