@@ -32,6 +32,8 @@ public class PortfolioExpectedLossCalcByCSV {
     	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs\\_vb\\csv_inputs");
 //    	Path inputFolder = Path.of("p366\\PorterVulns_ASK14");
     	Path inputFolder = Path.of("tests\\short_portfolio");
+    	
+    	boolean writeHazard = true;
 
         Path runFolder = baseFolder.resolve(inputFolder);
 
@@ -60,6 +62,9 @@ public class PortfolioExpectedLossCalcByCSV {
         String fileTag = config.getOrDefault("file_tag", runFolder.getFileName().toString());
         Path outputCSV = runFolder.resolve(fileTag + ".csv");
         Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated.csv");
+        Path hazardJson = writeHazard
+                ? runFolder.resolve(fileTag + "_hazard.json")
+                : null;
 
         String erfClassName = config.get("erf_class");
         String gmmName = config.get("gmm");
@@ -134,7 +139,8 @@ public class PortfolioExpectedLossCalcByCSV {
                         expVulnLib,
                         gmm,
                         erf,
-                        integrationMethodEnum
+                        integrationMethodEnum,
+                        hazardJson
                 );
 
         // ------------------- 11. Compute Expected Loss -------------------
