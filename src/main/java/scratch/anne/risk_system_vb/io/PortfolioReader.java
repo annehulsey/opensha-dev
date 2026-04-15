@@ -4,6 +4,7 @@ import scratch.anne.risk_system_vb.portfolio.*;
 import scratch.anne.risk_system_vb.portfolio.assets.AbstractAsset;
 import scratch.anne.risk_system_vb.portfolio.assets.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityAsset;
+import scratch.anne.risk_system_vb.util.InputParsingUtil;
 import scratch.anne.risk_system_vb.util.Metadata;
 
 import java.io.IOException;
