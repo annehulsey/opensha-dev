@@ -14,7 +14,7 @@ import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey.ImDomain;
 import scratch.anne.risk_system_vb.util.NumericUtil.ImArrayParam;
 
-public class SimpleFragilityReaderExample {
+public class SimpleFragilityLibraryReaderExample {
 
     public static void main(String[] args) {
 
