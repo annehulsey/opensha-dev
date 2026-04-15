@@ -22,7 +22,7 @@ import scratch.anne.risk_system_vb.util.HazardFunctionUtil;
  *		    http://www.sparisk.com/pubs/Porter-2006-woodframe.pdf
  * </blockquote>
  */
-public class RiskIntegral {
+public class RiskConvolution {
 
     public enum IntegrationMethod { RIEMANN, CLOSED_FORM }
 
@@ -41,7 +41,7 @@ public class RiskIntegral {
      * @param hazardValue Hazard value (rate or probability of exceedance at vuln's imEdges)
      * @param method      Integration method (default: RIEMANN)
      */
-    public RiskIntegral(SimpleImResponseInterface response, double[] hazard, IntegrationMethod method) {
+    public RiskConvolution(SimpleImResponseInterface response, double[] hazard, IntegrationMethod method) {
         if (hazard != null && response.getImValues().length != hazard.length) {
             throw new IllegalArgumentException("response IM and hazard array lengths must match");
         }
@@ -57,7 +57,7 @@ public class RiskIntegral {
      * @param response   SimpleImResponse
      * @param hazard     Hazard array
      */
-    public RiskIntegral(SimpleImResponseInterface response, double[] hazard) {
+    public RiskConvolution(SimpleImResponseInterface response, double[] hazard) {
         this(response, hazard, null);
     }
 
@@ -70,7 +70,7 @@ public class RiskIntegral {
      * @param hazardFunc Hazard as DiscretizedFunc (x = IM, y = hazard value)
      * @param method     Integration method; if null, defaults to RIEMANN
      */
-    public RiskIntegral(SimpleImResponseInterface response, DiscretizedFunc hazardFunc, IntegrationMethod method) {
+    public RiskConvolution(SimpleImResponseInterface response, DiscretizedFunc hazardFunc, IntegrationMethod method) {
         this.response = response;
         this.hazardValues = HazardFunctionUtil.convertHazFuncToArray(hazardFunc, response.getImValues());
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
@@ -83,7 +83,7 @@ public class RiskIntegral {
      * @param response   SimpleImResponse 
      * @param hazardFunc Hazard as DiscretizedFunc
      */
-    public RiskIntegral(SimpleImResponseInterface response, DiscretizedFunc hazardFunc) {
+    public RiskConvolution(SimpleImResponseInterface response, DiscretizedFunc hazardFunc) {
         this(response, hazardFunc, null);
     }
 
@@ -96,7 +96,7 @@ public class RiskIntegral {
      * @param hazard   Hazard values corresponding to IMs
      * @param method   Integration method; if null, defaults to RIEMANN
      */
-    public RiskIntegral(double[] im, double[] fim, double[] hazard, IntegrationMethod method) {
+    public RiskConvolution(double[] im, double[] fim, double[] hazard, IntegrationMethod method) {
         if (im.length != fim.length || im.length != hazard.length) {
             throw new IllegalArgumentException("IM, F(IM), and hazard arrays must all be the same length");
         }
@@ -113,7 +113,7 @@ public class RiskIntegral {
      * @param fim      Response-as-a-function-of-im array
      * @param hazard Hazard array
      */
-    public RiskIntegral(double[] im, double[] fim, double[] hazardValues) {
+    public RiskConvolution(double[] im, double[] fim, double[] hazardValues) {
         this(im, fim, hazardValues, null);
     }
 
@@ -125,7 +125,7 @@ public class RiskIntegral {
      * @param response   SimpleImResponse
      * @param method     Integration method; if null, defaults to RIEMANN
      */
-    public RiskIntegral(SimpleImResponseInterface response, IntegrationMethod method) {
+    public RiskConvolution(SimpleImResponseInterface response, IntegrationMethod method) {
         this.response = response;
         this.hazardValues = null;
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
@@ -138,7 +138,7 @@ public class RiskIntegral {
      *
      * @param response SimpleImResponse
      */
-    public RiskIntegral(SimpleImResponseInterface response) {
+    public RiskConvolution(SimpleImResponseInterface response) {
         this.response = response;
         this.hazardValues = null;
         this.method = null;
@@ -153,7 +153,7 @@ public class RiskIntegral {
      * @param fim     Response-as-a-function-of-im array
      * @param method  Integration method; if null, defaults to RIEMANN
      */
-    public RiskIntegral(double[] im, double[] fim, IntegrationMethod method) {
+    public RiskConvolution(double[] im, double[] fim, IntegrationMethod method) {
         this(new SimpleImResponseFunction(im, fim), method);
     }
 
@@ -165,7 +165,7 @@ public class RiskIntegral {
      * @param im      Intensity measure array
      * @param fim     Response-as-a-function-of-im array
      */
-    public RiskIntegral(double[] im, double[] fim) {
+    public RiskConvolution(double[] im, double[] fim) {
         this.response = new SimpleImResponseFunction(im, fim);
         this.hazardValues = null;
         this.method = null;

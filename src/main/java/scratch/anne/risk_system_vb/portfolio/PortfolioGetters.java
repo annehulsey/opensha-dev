@@ -56,7 +56,7 @@ public interface PortfolioGetters<T extends AbstractAsset> {
     List<String> getAdditionalFieldNames();
 
     /** Distinct values for a given field. */
-    Set<String> getAdditionalFieldValues(String field);
+    List<String> getAdditionalFieldValues(String field);
 
     /**
      * High-level lookup:

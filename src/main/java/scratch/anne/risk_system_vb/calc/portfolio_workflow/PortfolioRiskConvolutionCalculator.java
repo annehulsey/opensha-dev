@@ -1,8 +1,5 @@
 package scratch.anne.risk_system_vb.calc.portfolio_workflow;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -19,10 +16,10 @@ import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.imr.ScalarIMR;
 import org.opensha.sha.imr.param.IntensityMeasureParams.PeriodParam;
 
-import scratch.anne.risk_system_vb.calc.convolution.RiskIntegral;
+import scratch.anne.risk_system_vb.calc.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.io.HazardJsonWriter;
-import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.ExpectedLossAsset;
-import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolio;
+import scratch.anne.risk_system_vb.portfolio.assets.RiskConvolutionAsset;
+import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.StringUtil.ImtPeriod;
@@ -30,7 +27,7 @@ import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 
 /**
  * Portfolio-level calculator that computes hazard curves per (SiteKey, ImKey)
- * and immediately propagates them into expected loss calculations.
+ * and propagates them into risk integral calculations.
  *
  * <p>Includes an optional hazard trace writer that streams
  * hazard curves to CSV for debugging and reproducibility.</p>
@@ -43,13 +40,13 @@ import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
  * </ul>
  *
  */
-public class ExpectedLossPortfolioCalculator {
+public class PortfolioRiskConvolutionCalculator {
 
-    private final ExpectedLossPortfolio elossPortfolio;
-    private final SimpleImResponseLibrary vulnLib;
+    private final RiskConvolutionPortfolio riskConvolutionPortfolio;
+    private final SimpleImResponseLibrary responseLib;
     private final AttenRelRef gmmRef;
     private final AbstractERF erf;
-    private final RiskIntegral.IntegrationMethod integrationMethod;
+    private final RiskConvolution.IntegrationMethod integrationMethod;
 
     /** Optional hazard json writer (null if disabled). */
     private final HazardJsonWriter hazardWriter;
@@ -57,23 +54,23 @@ public class ExpectedLossPortfolioCalculator {
     /**
      * Full constructor with optional hazard JSON output.
      *
-     * @param elossPortfolio portfolio
-     * @param elossVulnLib vulnerability library
+     * @param riskConvolutionPortfolio portfolio
+     * @param responseLib simple response library
      * @param gmmRef GMPE reference
      * @param erf earthquake rupture forecast
      * @param integrationMethod integration method
      * @param hazardJsonPath optional path for hazard curve CSV (null disables writing)
      */
-    public ExpectedLossPortfolioCalculator(
-            ExpectedLossPortfolio elossPortfolio,
-            SimpleImResponseLibrary elossVulnLib,
+    public PortfolioRiskConvolutionCalculator(
+    		RiskConvolutionPortfolio riskConvolutionPortfolio,
+            SimpleImResponseLibrary responseLib,
             AttenRelRef gmmRef,
             AbstractERF erf,
-            RiskIntegral.IntegrationMethod integrationMethod,
+            RiskConvolution.IntegrationMethod integrationMethod,
             Path hazardJsonPath
     ) {
-        this.elossPortfolio = elossPortfolio;
-        this.vulnLib = elossVulnLib;
+        this.riskConvolutionPortfolio = riskConvolutionPortfolio;
+        this.responseLib = responseLib;
         this.gmmRef = gmmRef;
         this.erf = erf;
         this.integrationMethod = integrationMethod;
@@ -87,43 +84,43 @@ public class ExpectedLossPortfolioCalculator {
      * Constructor specifying only integration method.
      * Hazard logging is disabled.
      */
-    public ExpectedLossPortfolioCalculator(
-            ExpectedLossPortfolio elossPortfolio,
-            SimpleImResponseLibrary elossVulnLib,
+    public PortfolioRiskConvolutionCalculator(
+    		RiskConvolutionPortfolio riskConvolutionPortfolio,
+            SimpleImResponseLibrary responseLib,
             AttenRelRef gmmRef,
             AbstractERF erf,
-            RiskIntegral.IntegrationMethod integrationMethod
+            RiskConvolution.IntegrationMethod integrationMethod
     ) {
-        this(elossPortfolio, elossVulnLib, gmmRef, erf,
+        this(riskConvolutionPortfolio, responseLib, gmmRef, erf,
                 integrationMethod, null);
     }
     
     /**
      * Constructor enabling hazard CSV output with default integration method.
      */
-    public ExpectedLossPortfolioCalculator(
-            ExpectedLossPortfolio elossPortfolio,
-            SimpleImResponseLibrary elossVulnLib,
+    public PortfolioRiskConvolutionCalculator(
+    		RiskConvolutionPortfolio riskConvolutionPortfolio,
+            SimpleImResponseLibrary responseLib,
             AttenRelRef gmmRef,
             AbstractERF erf,
-            Path hazardCsvPath
+            Path hazardJsonPath
     ) {
-        this(elossPortfolio, elossVulnLib, gmmRef, erf,
-                RiskIntegral.IntegrationMethod.CLOSED_FORM,
-                hazardCsvPath);
+        this(riskConvolutionPortfolio, responseLib, gmmRef, erf,
+                RiskConvolution.IntegrationMethod.CLOSED_FORM,
+                hazardJsonPath);
     }
 
     /**
      * Convenience constructor (default integration and no hazard output).
      */
-    public ExpectedLossPortfolioCalculator(
-            ExpectedLossPortfolio elossPortfolio,
-            SimpleImResponseLibrary elossVulnLib,
+    public PortfolioRiskConvolutionCalculator(
+    		RiskConvolutionPortfolio riskConvolutionPortfolio,
+            SimpleImResponseLibrary responseLib,
             AttenRelRef gmmRef,
             AbstractERF erf
     ) {
-        this(elossPortfolio, elossVulnLib, gmmRef, erf,
-                RiskIntegral.IntegrationMethod.CLOSED_FORM, null);
+        this(riskConvolutionPortfolio, responseLib, gmmRef, erf,
+                RiskConvolution.IntegrationMethod.CLOSED_FORM, null);
     }
 
     /**
@@ -138,7 +135,7 @@ public class ExpectedLossPortfolioCalculator {
      *
      * @return portfolio with computed expected losses
      */
-    public ExpectedLossPortfolio computeExpectedLoss() {
+    public RiskConvolutionPortfolio computeRiskConvolution() {
 
     	// ---- Prepare hazard calculators and GMM deque ----
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
@@ -147,7 +144,7 @@ public class ExpectedLossPortfolioCalculator {
         ScalarIMR gmm0 = gmmRef.get();
         
         // Build sites from ELossPortfolio site keys
-        List<SiteKey> siteKeys = new ArrayList<>(elossPortfolio.getSiteKeys());
+        List<SiteKey> siteKeys = new ArrayList<>(riskConvolutionPortfolio.getSiteKeys());
         List<Site> sites = new ArrayList<>();
         for (SiteKey siteKey : siteKeys) {
             Site site = new Site(new Location(siteKey.getLat(), siteKey.getLon()));
@@ -193,7 +190,7 @@ public class ExpectedLossPortfolioCalculator {
                     gmm.setSite(site);
 
                     // ---- Get IMKey groups per site from lower-level portfolio ----
-                    for (ImKey imKey : elossPortfolio.getImKeysBySite(siteKey)) {
+                    for (ImKey imKey : riskConvolutionPortfolio.getImKeysBySite(siteKey)) {
 
                         // get IM parameters for gmm
                     	ImtPeriod imtPeriod = imKey.getImtPeriod();
@@ -220,16 +217,16 @@ public class ExpectedLossPortfolioCalculator {
                         }
 
                         // ---- Compute normalized expected loss per asset ---
-                        for (ExpectedLossAsset asset :
-                                elossPortfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
+                        for (RiskConvolutionAsset asset :
+                                riskConvolutionPortfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
 
-                            RiskIntegral calcEL = new RiskIntegral(
-                                    vulnLib.getByName(asset.getModelName()),
+                            RiskConvolution calcRisk = new RiskConvolution(
+                                    responseLib.getByName(asset.getModelName()),
                                     hazardY,
                                     integrationMethod
                             );
 
-                            asset.setNormalizedExpectedLoss(calcEL.compute());
+                            asset.setRiskConvolutionResult(calcRisk.compute());
                         }
                     }
 
@@ -269,7 +266,7 @@ public class ExpectedLossPortfolioCalculator {
             System.out.println("Hazard written to run folder");
         }
 
-        elossPortfolio.setExpectedLossComputed(true);
-        return elossPortfolio;
+        riskConvolutionPortfolio.setRiskConvolutionComputed(true);
+        return riskConvolutionPortfolio;
     }
 }

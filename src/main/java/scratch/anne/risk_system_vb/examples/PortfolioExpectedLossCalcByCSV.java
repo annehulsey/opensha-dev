@@ -7,14 +7,14 @@ import java.io.*;
 import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
 
-import scratch.anne.risk_system_vb.calc.convolution.RiskIntegral;
-import scratch.anne.risk_system_vb.calc.portfolio_workflow.ExpectedLossPortfolioCalculator;
+import scratch.anne.risk_system_vb.calc.convolution.RiskConvolution;
+import scratch.anne.risk_system_vb.calc.portfolio_workflow.PortfolioRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.io.PortfolioReader;
 import scratch.anne.risk_system_vb.io.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityAsset;
-import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolio;
-import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ImIndexedPortfolio;
+import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
+import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolioAggregator;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
@@ -109,10 +109,7 @@ public class PortfolioExpectedLossCalcByCSV {
                 SimpleImVulnLibraryPreparer.prepare(vulnLib, assetModelNames, transformer);
 
         // ------------------- 7. Wrap portfolio with IMKey mapping -------------------
-        ImIndexedPortfolio<VulnerabilityAsset> indexedPortfolio =
-                ImIndexedPortfolio.of(basePortfolio, expVulnLib);
-
-        ExpectedLossPortfolio elossPortfolio = new ExpectedLossPortfolio(indexedPortfolio);
+        RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, expVulnLib);
 
         // ------------------- 8. Dynamic ERF -------------------
         AbstractERF erf = (AbstractERF)
@@ -128,14 +125,14 @@ public class PortfolioExpectedLossCalcByCSV {
                 AttenRelRef.valueOf(gmmName.toUpperCase());
 
         // ------------------- 10. Create calculator -------------------
-        RiskIntegral.IntegrationMethod integrationMethodEnum =
+        RiskConvolution.IntegrationMethod integrationMethodEnum =
                 "RIEMANN".equalsIgnoreCase(integrationMethod)
-                        ? RiskIntegral.IntegrationMethod.RIEMANN
-                        : RiskIntegral.IntegrationMethod.CLOSED_FORM;
+                        ? RiskConvolution.IntegrationMethod.RIEMANN
+                        : RiskConvolution.IntegrationMethod.CLOSED_FORM;
         
-        ExpectedLossPortfolioCalculator calculator =
-                new ExpectedLossPortfolioCalculator(
-                        elossPortfolio,
+        PortfolioRiskConvolutionCalculator calculator =
+                new PortfolioRiskConvolutionCalculator(
+                        riskConvolutionPortfolio,
                         expVulnLib,
                         gmm,
                         erf,
@@ -144,15 +141,16 @@ public class PortfolioExpectedLossCalcByCSV {
                 );
 
         // ------------------- 11. Compute Expected Loss -------------------
-        elossPortfolio = calculator.computeExpectedLoss();
-        if (!elossPortfolio.isExpectedLossComputed()) {
-            throw new IllegalStateException("Expected loss computation did not complete correctly!");
+        riskConvolutionPortfolio = calculator.computeRiskConvolution();
+        if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
+            throw new IllegalStateException("Risk convolution did not complete correctly.");
         }
-        elossPortfolio.printSummary();
+        ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
+        aggregator.printSummary();
 
         // ------------------- 12. Write outputs to run folder -------------------
-        elossPortfolio.writeCSV(outputCSV);
-        elossPortfolio.writeAggregatedCSV(aggregatedOutputCSV);
+        aggregator.writeCSV(outputCSV);
+        aggregator.writeAggregatedCSV(aggregatedOutputCSV);
 
         System.out.println("Outputs written to run folder:");
         System.out.println(outputCSV);
