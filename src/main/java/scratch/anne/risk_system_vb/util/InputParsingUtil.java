@@ -1,4 +1,4 @@
-package scratch.anne.risk_system_vb.io;
+package scratch.anne.risk_system_vb.util;
 
 import java.util.Arrays;
 import java.util.List;

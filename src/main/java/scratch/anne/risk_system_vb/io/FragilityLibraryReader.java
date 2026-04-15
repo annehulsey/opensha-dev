@@ -12,6 +12,7 @@ import com.google.gson.JsonObject;
 import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
 import scratch.anne.risk_system_vb.structural_response.fragilities.FragilityModel;
 import scratch.anne.risk_system_vb.structural_response.fragilities.definitions.*;
+import scratch.anne.risk_system_vb.util.InputParsingUtil;
 import scratch.anne.risk_system_vb.util.Metadata;
 import scratch.anne.risk_system_vb.util.StringUtil;
 import scratch.anne.risk_system_vb.util.enums.IMT;
@@ -152,7 +153,7 @@ public class FragilityLibraryReader {
                     break;
 
                 case "discrete":
-                    def = parseDiscrete(lsNode);
+                    def = parseDiscrete(lsNode, compID, lsName);
                     break;
 
                 default:
@@ -165,20 +166,32 @@ public class FragilityLibraryReader {
         return new FragilityModel(compID, imt, period, lsList, primaryLS);
     }
 
-    private static DiscreteFragilityDefinition parseDiscrete(JsonObject dsNode) {
-        JsonArray imLevelsJson = dsNode.getAsJsonArray("imLevels");
-        double[] imLevels = new double[imLevelsJson.size()];
-        for (int i = 0; i < imLevelsJson.size(); i++) {
-            imLevels[i] = imLevelsJson.get(i).getAsDouble();
-        }
+    private static DiscreteFragilityDefinition parseDiscrete(
+            JsonObject dsNode,
+            String compID,
+            String lsName) {
 
-        JsonArray probJson = dsNode.getAsJsonArray("probability");
-        double[] probability = new double[probJson.size()];
-        for (int i = 0; i < probJson.size(); i++) {
-            probability[i] = probJson.get(i).getAsDouble();
-        }
+        Gson gson = new Gson();
 
-        return new DiscreteFragilityDefinition(imLevels, probability);
+        double[] imLevels =
+                InputParsingUtil.parseJsonNumericArray(
+                        gson.fromJson(
+                                dsNode.get("imLevels"),
+                                Object.class));
+
+        double[] probability =
+                InputParsingUtil.parseJsonNumericArray(
+                        gson.fromJson(
+                                dsNode.get("probability"),
+                                Object.class));
+
+        InputParsingUtil.checkMonotonicIM(
+                compID + ":" + lsName,
+                imLevels);
+
+        return new DiscreteFragilityDefinition(
+                imLevels,
+                probability);
     }
 
     // ------------------------------------------------------------------------
@@ -190,7 +203,7 @@ public class FragilityLibraryReader {
         try (Stream<String> lines = Files.lines(path)) {
             rows = lines.skip(1)
                     .map(line -> Arrays.stream(line.split(",", -1))
-                            .map(String::trim)
+                    		.map(InputParsingUtil::cleanCsvString)
                             .toArray(String[]::new))
                     .filter(tokens -> tokens.length >= 9)
                     .collect(Collectors.toList());
@@ -307,9 +320,9 @@ public class FragilityLibraryReader {
 
                     case "lognormal":
                         double median =
-                                Double.parseDouble(lsRows.get(0)[7]);
+                        		InputParsingUtil.parseDoubleOrThrow(lsRows.get(0)[7]);
                         double beta =
-                                Double.parseDouble(lsRows.get(0)[8]);
+                        		InputParsingUtil.parseDoubleOrThrow(lsRows.get(0)[8]);
 
                         def = new LognormalFragilityDefinition(
                                 median, beta);
@@ -318,11 +331,11 @@ public class FragilityLibraryReader {
                     case "discrete":
 
                         double[] imLevels = lsRows.stream()
-                                .mapToDouble(r -> Double.parseDouble(r[5]))
+                                .mapToDouble(r -> InputParsingUtil.parseDoubleOrThrow(r[5]))
                                 .toArray();
 
                         double[] probabilities = lsRows.stream()
-                                .mapToDouble(r -> Double.parseDouble(r[6]))
+                                .mapToDouble(r -> InputParsingUtil.parseDoubleOrThrow(r[6]))
                                 .toArray();
 
                         def = new DiscreteFragilityDefinition(
