@@ -7,18 +7,18 @@ import java.io.*;
 import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
 
-import scratch.anne.risk_system_vb.calc.convolution.RiskConvolution;
-import scratch.anne.risk_system_vb.calc.portfolio_workflow.PortfolioRiskConvolutionCalculator;
-import scratch.anne.risk_system_vb.io.PortfolioReader;
-import scratch.anne.risk_system_vb.io.VulnerabilityLibraryReader;
-import scratch.anne.risk_system_vb.portfolio.Portfolio;
-import scratch.anne.risk_system_vb.portfolio.assets.vulnerability.VulnerabilityAsset;
-import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
-import scratch.anne.risk_system_vb.portfolio.portfolio_wrappers.ExpectedLossPortfolioAggregator;
-import scratch.anne.risk_system_vb.structural_response.ResponseModelLibrary;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
-import scratch.anne.risk_system_vb.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.structural_response.SimpleImResponseLibrary;
+import scratch.anne.risk_system_vb.domain.asset.vulnerability.VulnerabilityAsset;
+import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.ExpectedLossPortfolioAggregator;
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
+import scratch.anne.risk_system_vb.domain.structural_response.ResponseModelLibrary;
+import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
+import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
+import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.VulnerabilityModel;
+import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
+import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
+import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
+import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 import scratch.anne.risk_system_vb.util.IO;
 
@@ -30,7 +30,7 @@ public class PortfolioExpectedLossCalcByCSV {
     public static void main(String[] args) throws Exception {
     	
     	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\java_outputs\\_vb\\csv_inputs");
-//    	Path inputFolder = Path.of("p366\\PorterVulns_ASK14");
+//    	Path inputFolder = Path.of("p366\\PorterVulns");
     	Path inputFolder = Path.of("tests\\short_portfolio");
     	
     	boolean writeHazard = true;
