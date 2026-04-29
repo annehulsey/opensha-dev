@@ -1,10 +1,13 @@
 package scratch.anne.risk_system_vb.domain.asset.fragility;
 
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
+import scratch.anne.risk_system_vb.engine.convolution.ConvolutionResult;
 
 public class FailureProbabilityAsset extends RiskConvolutionAsset{
 
     private final FragilityAsset asset;
+    
+    private ConvolutionResult riskResult;
 
     private double probabilityOfFailure = Double.NaN;
 
@@ -30,21 +33,18 @@ public class FailureProbabilityAsset extends RiskConvolutionAsset{
         return probabilityOfFailure;
     }
 
-    public void setProbabilityOfFailure(double value) {
-        this.probabilityOfFailure = value;
-    }
-
     /** wrap the loss setter for generic workflows */
 	@Override
-	public void setRiskConvolutionResult(double value) {
-		this.setProbabilityOfFailure(value);
+	public void setRiskConvolutionResult(ConvolutionResult result) {
+		this.riskResult = result;
+		this.probabilityOfFailure = result.risk;
 		
 	}
 
 	/** wrap the loss getter for generic workflows */
 	@Override
-	public double getRiskConvolutionResult() {
-		return this.getProbabilityOfFailure();
+	public ConvolutionResult getRiskConvolutionResult() {
+		return this.riskResult;
 	}
 	
 }

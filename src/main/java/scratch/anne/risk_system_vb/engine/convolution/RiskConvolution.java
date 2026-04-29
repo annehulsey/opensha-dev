@@ -174,7 +174,7 @@ public class RiskConvolution {
  // -------------------- Compute Overloads --------------------
 
     /** Use stored hazard array */
-    public double compute() {
+    public ConvolutionResult compute() {
         if (hazardValues == null) {
             throw new IllegalStateException("Hazard array is not set. Provide hazard to compute.");
         }
@@ -182,7 +182,7 @@ public class RiskConvolution {
     }
 
     /** Provide hazard as double array */
-    public double compute(double[] hazard) {
+    public ConvolutionResult compute(double[] hazard) {
         if (hazard.length != response.getImValues().length) {
             throw new IllegalArgumentException("Hazard array length does not match vulnerability IM length");
         }
@@ -191,7 +191,7 @@ public class RiskConvolution {
     }
 
     /** Provide hazard as DiscretizedFunc (checks IMs) */
-    public double compute(DiscretizedFunc hazardFunc) {
+    public ConvolutionResult compute(DiscretizedFunc hazardFunc) {
         this.hazardValues = HazardFunctionUtil.convertHazFuncToArray(hazardFunc, response.getImValues());
         return computeInternal(hazardValues);
     }
@@ -201,7 +201,7 @@ public class RiskConvolution {
     /**
      * Shared internal computation, chooses method based on this.method
      */
-    private double computeInternal(double[] hazardValues) {
+    private ConvolutionResult computeInternal(double[] hazardValues) {
         switch (method) {
             case RIEMANN:
                 return computeRiemann(hazardValues);
@@ -212,31 +212,36 @@ public class RiskConvolution {
         }
     }
     // ---------------------- Core Riemann Integration ----------------------
-    private double computeRiemann(double[] hazard) {
-        double risk = 0.0;
-        double[] respMid = response.getRespMid();
+    private ConvolutionResult computeRiemann(double[] hazard) {
         
+        double[] respMid = response.getRespMid();
         int n = respMid.length;
+        
+        double risk = 0.0;
+        double[] contribution = new double[n];
 
         // interior bins
         for (int i = 0; i < respMid.length - 1; i++) {
             double deltaHazard = hazardValues[i] - hazardValues[i + 1];
-            risk += respMid[i] * deltaHazard;
+            contribution[i] = respMid[i] * deltaHazard;
+            risk += contribution[i];
         }
 
         // tail bin
-        risk += respMid[n - 1] * hazardValues[n - 1];
+        contribution[n - 1] = respMid[n - 1] * hazardValues[n - 1];
+        risk += contribution[n - 1];
 
-        return risk;
+        return new ConvolutionResult(risk, contribution);
     }
 
 
     // ---------------------- Porter Closed-Form Integration ----------------------
-    private double computeClosedForm(double[] hazardValues) {
+    private ConvolutionResult computeClosedForm(double[] hazardValues) {
         double[] iml = response.getImValues();
         double[] respEdge = response.getRespEdges();
 
         double risk = 0.0;
+        double[] contribution = new double[iml.length];
 
         for (int i = 1; i < iml.length; i++) {
             double imlDelta = iml[i] - iml[i - 1];
@@ -250,11 +255,12 @@ public class RiskConvolution {
 
             double deltaRisk = term1 - term2;
             if (!Double.isNaN(deltaRisk) && !Double.isInfinite(deltaRisk)) {
+            	contribution[i] = deltaRisk;
                 risk += deltaRisk;
             }
         }
 
-        return risk;
+        return new ConvolutionResult(risk, contribution);
     }
     
 
