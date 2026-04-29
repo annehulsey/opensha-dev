@@ -37,6 +37,9 @@ public interface PortfolioGetters<T extends AbstractAsset> {
 
     /** Lookup assets at a site. */
     List<T> getAssetsBySite(SiteKey siteKey);
+    
+    /** Get site key per asset. */
+    SiteKey getSiteKey(T asset);
 
 
     // =========================================================
