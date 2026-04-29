@@ -2,6 +2,7 @@ package scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers;
 
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
+import scratch.anne.risk_system_vb.domain.asset.fragility.PBRSurvivalAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.util.Metadata;
@@ -99,6 +100,11 @@ public final class ExpectedLossPortfolioAggregator
     @Override
     public Set<SiteKey> getSiteKeys() {
         return base.getSiteKeys();
+    }
+    
+    @Override
+    public SiteKey getSiteKey(ExpectedLossAsset asset) {
+        return base.getSiteKey(asset);
     }
 
     @Override

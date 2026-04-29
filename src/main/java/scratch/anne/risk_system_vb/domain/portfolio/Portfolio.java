@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset;
+import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
 import scratch.anne.risk_system_vb.util.Metadata;
 import scratch.anne.risk_system_vb.util.PortfolioGroupingUtils;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
@@ -32,6 +33,7 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
 
     /** Site grouping (lat, lon, vs30) */
     private final Map<SiteKey, List<T>> siteMap;
+    private final Map<T, SiteKey> siteKeyByAsset;
 
     /** Additional field grouping: field → value → assets */
     private final Map<String, Map<String, List<T>>> additionalFieldGroups;
@@ -90,6 +92,15 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
                         assets,
                         AbstractAsset::getAdditionalFields
                 );
+        
+        Map<T, SiteKey> tmp = new LinkedHashMap<>();
+        for (Map.Entry<SiteKey, List<T>> e : siteMap.entrySet()) {
+            SiteKey site = e.getKey();
+            for (T asset : assets) {
+                tmp.put((T) asset, site);
+            }
+        }
+        this.siteKeyByAsset = Collections.unmodifiableMap(tmp);
 
         // -------------------------
         // Field name ordering (derived from actual data)
@@ -186,6 +197,11 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
     @Override
     public List<T> getAssetsBySite(SiteKey key) {
         return siteMap.getOrDefault(key, List.of());
+    }
+    
+    @Override
+    public SiteKey getSiteKey(T asset) {
+        return siteKeyByAsset.get(asset);
     }
 
     // ------------------------------------------------------------------------
