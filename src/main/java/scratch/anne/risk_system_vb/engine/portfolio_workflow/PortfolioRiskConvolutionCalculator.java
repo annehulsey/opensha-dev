@@ -1,6 +1,5 @@
 package scratch.anne.risk_system_vb.engine.portfolio_workflow;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,13 +16,14 @@ import org.opensha.sha.imr.ScalarIMR;
 import org.opensha.sha.imr.param.IntensityMeasureParams.PeriodParam;
 
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
+import scratch.anne.risk_system_vb.domain.hazard.HazardResult;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
-import scratch.anne.risk_system_vb.io.writers.HazardJsonWriter;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.StringUtil.ImtPeriod;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
+import scratch.anne.risk_system_vb.util.enums.IMT;
 
 /**
  * Portfolio-level calculator that computes hazard curves per (SiteKey, ImKey)
@@ -36,7 +36,7 @@ import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
  * <ul>
  *   <li>Hazard computation is parallelized by site</li>
  *   <li>Risk computation is performed immediately after hazard computation</li>
- *   <li>Hazard curves can optionally be recorded via a streaming writer</li>
+ *   <li>Hazard curves are stored in the portfolio
  * </ul>
  *
  */
@@ -48,9 +48,6 @@ public class PortfolioRiskConvolutionCalculator {
     private final AbstractERF erf;
     private final RiskConvolution.IntegrationMethod integrationMethod;
 
-    /** Optional hazard json writer (null if disabled). */
-    private final HazardJsonWriter hazardWriter;
-
     /**
      * Full constructor with optional hazard JSON output.
      *
@@ -59,30 +56,6 @@ public class PortfolioRiskConvolutionCalculator {
      * @param gmmRef GMPE reference
      * @param erf earthquake rupture forecast
      * @param integrationMethod integration method
-     * @param hazardJsonPath optional path for hazard curve CSV (null disables writing)
-     */
-    public PortfolioRiskConvolutionCalculator(
-    		RiskConvolutionPortfolio riskConvolutionPortfolio,
-            SimpleImResponseLibrary responseLib,
-            AttenRelRef gmmRef,
-            AbstractERF erf,
-            RiskConvolution.IntegrationMethod integrationMethod,
-            Path hazardJsonPath
-    ) {
-        this.riskConvolutionPortfolio = riskConvolutionPortfolio;
-        this.responseLib = responseLib;
-        this.gmmRef = gmmRef;
-        this.erf = erf;
-        this.integrationMethod = integrationMethod;
-
-        this.hazardWriter = (hazardJsonPath != null)
-                ? new HazardJsonWriter(hazardJsonPath)
-                : null;
-    }
-    
-    /**
-     * Constructor specifying only integration method.
-     * Hazard logging is disabled.
      */
     public PortfolioRiskConvolutionCalculator(
     		RiskConvolutionPortfolio riskConvolutionPortfolio,
@@ -91,27 +64,16 @@ public class PortfolioRiskConvolutionCalculator {
             AbstractERF erf,
             RiskConvolution.IntegrationMethod integrationMethod
     ) {
-        this(riskConvolutionPortfolio, responseLib, gmmRef, erf,
-                integrationMethod, null);
-    }
-    
-    /**
-     * Constructor enabling hazard CSV output with default integration method.
-     */
-    public PortfolioRiskConvolutionCalculator(
-    		RiskConvolutionPortfolio riskConvolutionPortfolio,
-            SimpleImResponseLibrary responseLib,
-            AttenRelRef gmmRef,
-            AbstractERF erf,
-            Path hazardJsonPath
-    ) {
-        this(riskConvolutionPortfolio, responseLib, gmmRef, erf,
-                RiskConvolution.IntegrationMethod.CLOSED_FORM,
-                hazardJsonPath);
+        this.riskConvolutionPortfolio = riskConvolutionPortfolio;
+        this.responseLib = responseLib;
+        this.gmmRef = gmmRef;
+        this.erf = erf;
+        this.integrationMethod = integrationMethod;
+
     }
 
     /**
-     * Convenience constructor (default integration and no hazard output).
+     * Convenience constructor (default integration).
      */
     public PortfolioRiskConvolutionCalculator(
     		RiskConvolutionPortfolio riskConvolutionPortfolio,
@@ -120,7 +82,7 @@ public class PortfolioRiskConvolutionCalculator {
             AbstractERF erf
     ) {
         this(riskConvolutionPortfolio, responseLib, gmmRef, erf,
-                RiskConvolution.IntegrationMethod.CLOSED_FORM, null);
+                RiskConvolution.IntegrationMethod.CLOSED_FORM);
     }
 
     /**
@@ -195,7 +157,9 @@ public class PortfolioRiskConvolutionCalculator {
                         // get IM parameters for gmm
                     	ImtPeriod imtPeriod = imKey.getImtPeriod();
                     	gmm.setIntensityMeasure(imtPeriod.imt.name());
-                    	gmm.getParameter(PeriodParam.NAME).setValue(imtPeriod.period);
+                    	if (imtPeriod.imt == IMT.SA) {
+                    	    gmm.getParameter(PeriodParam.NAME).setValue(imtPeriod.period);
+                    	}
 
                         // Build hazard curve im values
                         DiscretizedFunc hazFunc = new ArbitrarilyDiscretizedFunc();
@@ -209,12 +173,13 @@ public class PortfolioRiskConvolutionCalculator {
                         for (int j = 0; j < hazFunc.size(); j++) {
                             hazardY[j] = hazFunc.getY(j);
                         }
-
                         
-                        // ----------- OPTIONAL: hazard logging ----------------
-                        if (hazardWriter != null) {
-                            hazardWriter.write(siteKey, imKey, hazardY);
-                        }
+                        riskConvolutionPortfolio.storeHazard(
+                                siteKey,
+                                imKey,
+                                new HazardResult(hazardY)
+                        );
+
 
                         // ---- Compute normalized expected loss per asset ---
                         for (RiskConvolutionAsset asset :
@@ -260,13 +225,9 @@ public class PortfolioRiskConvolutionCalculator {
         // Wait for completion
         for (CompletableFuture<Void> f : futures) f.join();
 
-        // flush hazard writer if enabled
-        if (hazardWriter != null) {
-            hazardWriter.close();
-            System.out.println("Hazard written to run folder");
-        }
-
         riskConvolutionPortfolio.setRiskConvolutionComputed(true);
         return riskConvolutionPortfolio;
     }
+    
+   
 }

@@ -3,6 +3,7 @@ package scratch.anne.risk_system_vb.io.writers;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 
@@ -21,7 +22,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * <pre>
  * {"lat":39.7,"lon":-105.2,"vs30":760,"imt":"PGA",
  *  "imls":[...],
- *  "hazard":[...]}
+ *  "poe":[...]}
  * </pre>
   */
 public class HazardJsonWriter implements AutoCloseable {
@@ -73,6 +74,13 @@ public class HazardJsonWriter implements AutoCloseable {
                     "HazardJsonWriter already closed");
 
         queue.add(new Record(site, imKey, hazardY));
+    }
+    
+    public void writePortfolio(RiskConvolutionPortfolio portfolio) {
+
+    	portfolio.forEachHazard((site, imKey, result) ->
+        	write(site, imKey, result.getProbabilities()));
+
     }
 
     @Override
@@ -132,7 +140,7 @@ public class HazardJsonWriter implements AutoCloseable {
         json.imt = r.imKey.getImtString();
 
         json.imls = x;
-        json.hazard = r.y;
+        json.poe = r.y;
 
         writer.write(gson.toJson(json));
         writer.write("\n");
@@ -151,7 +159,7 @@ public class HazardJsonWriter implements AutoCloseable {
         String imt;
 
         double[] imls;
-        double[] hazard;
+        double[] poe;
     }
 
     private static class Record {

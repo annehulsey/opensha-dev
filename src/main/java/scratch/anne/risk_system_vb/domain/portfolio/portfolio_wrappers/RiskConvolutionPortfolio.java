@@ -6,6 +6,7 @@ import scratch.anne.risk_system_vb.domain.asset.fragility.FailureProbabilityAsse
 import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.VulnerabilityAsset;
+import scratch.anne.risk_system_vb.domain.hazard.HazardResult;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponse;
@@ -17,6 +18,8 @@ import scratch.anne.risk_system_vb.util.PortfolioGroupingUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.function.TriConsumer;
 
 /**
  * Projection of a base Portfolio into a calculation-ready working set of RiskConvolutionAssets.
@@ -58,6 +61,13 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
     private final Metadata metadata;
 
     private boolean riskConvolutionComputed;
+    
+	 // ---------------------------------------------------------------------
+	 // Hazard results (computed state)
+	 // ---------------------------------------------------------------------
+	
+	 private final Map<SiteKey, Map<ImKey, HazardResult>> hazardResults =
+	         new LinkedHashMap<>();
 
     // ---------------------------------------------------------------------
     // Construction
@@ -71,6 +81,7 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
         Objects.requireNonNull(responseLibrary);
 
         this.riskConvolutionComputed = false;
+        // TODO track hazard duration in risk convolution results
 
         // Build IM lookup: modelName → IMKey
         Map<String, ImKey> responseToIm = new HashMap<>();
@@ -339,5 +350,31 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
         return assets.stream()
                 .map(RiskConvolutionAsset::getModelName)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+    
+    // ----- hazard storage helpers ---------
+    public void storeHazard(
+            SiteKey siteKey,
+            ImKey imKey,
+            HazardResult result
+    ) {
+        hazardResults
+            .computeIfAbsent(siteKey, s -> new LinkedHashMap<>())
+            .put(imKey, result);
+    }
+    
+    
+    public Map<SiteKey, Map<ImKey, HazardResult>> getHazardResults() {
+        return Collections.unmodifiableMap(hazardResults);
+    }
+    
+    public void forEachHazard(
+            TriConsumer<SiteKey, ImKey, HazardResult> consumer) {
+
+        hazardResults.forEach((site, imMap) ->
+            imMap.forEach((im, result) ->
+                consumer.accept(site, im, result)
+            )
+        );
     }
 }

@@ -19,6 +19,7 @@ import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
+import scratch.anne.risk_system_vb.io.writers.HazardJsonWriter;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 import scratch.anne.risk_system_vb.util.IO;
 
@@ -63,7 +64,7 @@ public class PortfolioExpectedLossCalcByCSV {
         Path outputCSV = runFolder.resolve(fileTag + ".csv");
         Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated.csv");
         Path hazardJson = writeHazard
-                ? runFolder.resolve(fileTag + "_hazard.json")
+                ? runFolder.resolve(fileTag + "_hazard-list.json")
                 : null;
 
         String erfClassName = config.get("erf_class");
@@ -95,7 +96,7 @@ public class PortfolioExpectedLossCalcByCSV {
         Portfolio<VulnerabilityAsset> basePortfolio =
                 PortfolioReader.readCSV(portfolioCSV, VulnerabilityAsset.class);
 
-        Set<String> assetModelNames = basePortfolio.getResponseModelNames();
+        Set<String> portfolioVulns = basePortfolio.getResponseModelNames();
 
         // ------------------- 5. Load vulnerability library -------------------
         ResponseModelLibrary<VulnerabilityModel> vulnLib =
@@ -106,7 +107,7 @@ public class PortfolioExpectedLossCalcByCSV {
                 ? new ImValueTransformer.NoImTransformation()
                 : new ImValueTransformer.LogInterpTransformation(logImStep);
         SimpleImResponseLibrary expVulnLib =
-                SimpleImVulnLibraryPreparer.prepare(vulnLib, assetModelNames, transformer);
+                SimpleImVulnLibraryPreparer.prepare(vulnLib, portfolioVulns, transformer);
 
         // ------------------- 7. Wrap portfolio with IMKey mapping -------------------
         RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, expVulnLib);
@@ -130,14 +131,22 @@ public class PortfolioExpectedLossCalcByCSV {
                         ? RiskConvolution.IntegrationMethod.RIEMANN
                         : RiskConvolution.IntegrationMethod.CLOSED_FORM;
         
+//        PortfolioRiskConvolutionCalculator calculator =
+//                new PortfolioRiskConvolutionCalculator(
+//                        riskConvolutionPortfolio,
+//                        expVulnLib,
+//                        gmm,
+//                        erf,
+//                        integrationMethodEnum,
+//                        hazardJson
+//                );
         PortfolioRiskConvolutionCalculator calculator =
                 new PortfolioRiskConvolutionCalculator(
                         riskConvolutionPortfolio,
                         expVulnLib,
                         gmm,
                         erf,
-                        integrationMethodEnum,
-                        hazardJson
+                        integrationMethodEnum
                 );
 
         // ------------------- 11. Compute Expected Loss -------------------
@@ -145,6 +154,11 @@ public class PortfolioExpectedLossCalcByCSV {
         if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
             throw new IllegalStateException("Risk convolution did not complete correctly.");
         }
+        try (HazardJsonWriter writer =
+		   new HazardJsonWriter(hazardJson)) {
+        		writer.writePortfolio(riskConvolutionPortfolio);
+		}
+        
         ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
         aggregator.printSummary();
 
