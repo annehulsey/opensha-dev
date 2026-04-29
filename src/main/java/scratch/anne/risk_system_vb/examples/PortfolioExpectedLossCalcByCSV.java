@@ -131,15 +131,6 @@ public class PortfolioExpectedLossCalcByCSV {
                         ? RiskConvolution.IntegrationMethod.RIEMANN
                         : RiskConvolution.IntegrationMethod.CLOSED_FORM;
         
-//        PortfolioRiskConvolutionCalculator calculator =
-//                new PortfolioRiskConvolutionCalculator(
-//                        riskConvolutionPortfolio,
-//                        expVulnLib,
-//                        gmm,
-//                        erf,
-//                        integrationMethodEnum,
-//                        hazardJson
-//                );
         PortfolioRiskConvolutionCalculator calculator =
                 new PortfolioRiskConvolutionCalculator(
                         riskConvolutionPortfolio,
@@ -169,6 +160,8 @@ public class PortfolioExpectedLossCalcByCSV {
         System.out.println("Outputs written to run folder:");
         System.out.println(outputCSV);
         System.out.println(aggregatedOutputCSV);
+        System.out.println(hazardJson);
+        
     }
 
     // ------------------- Helper: Load CSV config -------------------
