@@ -178,14 +178,14 @@ public final class SimpleImFragilityLibraryPreparer {
      */
     public static final class PrepareSpec {
 
-        private final Set<String> filterNames;
+        private final Set<String> fragilityNames;
         private final LimitState selectedLS;
         private final NumericUtil.ImArrayParam imParam;
         private final double[] customImValues;
         private final ImValueTransformer transformer;
 
         private PrepareSpec(Builder b) {
-            this.filterNames = b.filterNames;
+            this.fragilityNames = b.fragilityNames;
             this.selectedLS = b.selectedLS;
             this.imParam = b.imParam;
             this.customImValues = b.customImValues;
@@ -202,11 +202,11 @@ public final class SimpleImFragilityLibraryPreparer {
         List<FragilityModel> selectModels(
                 List<FragilityModel> models) {
 
-            if (filterNames == null)
+            if (fragilityNames == null)
                 return models;
 
             return models.stream()
-                    .filter(m -> filterNames.contains(m.getName()))
+                    .filter(m -> fragilityNames.contains(m.getName()))
                     .collect(Collectors.toList());
         }
 
@@ -264,7 +264,7 @@ public final class SimpleImFragilityLibraryPreparer {
 
         public static final class Builder {
 
-            private Set<String> filterNames;
+            private Set<String> fragilityNames;
             private LimitState selectedLS;
             private NumericUtil.ImArrayParam imParam;
             private double[] customImValues;
@@ -272,7 +272,7 @@ public final class SimpleImFragilityLibraryPreparer {
 
             /** Restrict preparation to selected model names. */
             public Builder filterNames(Set<String> names) {
-                this.filterNames = names;
+                this.fragilityNames = names;
                 return this;
             }
 
