@@ -55,6 +55,9 @@ public class PBRAppUI extends JFrame {
 	// --- Output ---
 	private PlotPanel plotPanel;
 	private JTextArea resultsText;
+	
+	private JProgressBar progressBar;
+	private JLabel progressLabel;
 
 	
 	private static final ERFOption[] ALLOWED_ERFS = {
@@ -118,7 +121,8 @@ public class PBRAppUI extends JFrame {
     }
 
     private JScrollPane buildControlPanel() {
-        JPanel container = new JPanel(new BorderLayout());
+    	JPanel container = new JPanel();
+    	container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
 
         JPanel formPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = defaultGbc();
@@ -142,6 +146,22 @@ public class PBRAppUI extends JFrame {
         gbc.gridy++;
         gbc.weighty = 1;
         formPanel.add(Box.createVerticalGlue(), gbc);
+        
+        // Progress panel (above buttons)
+        JPanel progressPanel = new JPanel(new BorderLayout());
+        progressLabel = new JLabel("Idle");
+        progressBar = new JProgressBar();
+        progressBar.setIndeterminate(false);
+
+        progressPanel.add(progressLabel, BorderLayout.NORTH);
+        progressPanel.add(progressBar, BorderLayout.CENTER);
+        progressPanel.setMaximumSize(
+                new Dimension(Integer.MAX_VALUE, 45)
+        );
+        progressBar.setPreferredSize(new Dimension(200, 18));
+        progressLabel.setBorder(
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)
+        );
 
         // Bottom button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
@@ -156,8 +176,11 @@ public class PBRAppUI extends JFrame {
         });
         buttonPanel.add(clear);
 
-        container.add(formPanel, BorderLayout.NORTH);
-        container.add(buttonPanel, BorderLayout.SOUTH);
+        container.add(formPanel);
+        container.add(Box.createVerticalStrut(5));
+        container.add(progressPanel);
+        container.add(Box.createVerticalStrut(5));
+        container.add(buttonPanel);
 
         JScrollPane scroll = new JScrollPane(container);
         scroll.setBorder(null);
@@ -312,173 +335,173 @@ public class PBRAppUI extends JFrame {
     
     // --------- collect inputs and run ----------------
     private void runCalculation() {
-    	
-    	plotPanel.clear();
-    	plotPanel.repaint();
 
-        try {
-        	String assetID = "GUI_Asset";
-        	String fragilityID = "GUI_Fragility";
-            double lat = Double.parseDouble(latField.getText());
-            double lon = Double.parseDouble(lonField.getText());
-            double vs30 = Double.parseDouble(vs30Field.getText());
-        	
-        	double age = Double.parseDouble(ageField.getText());
-            double median = Double.parseDouble(medianField.getText());
-            double beta = Double.parseDouble(betaField.getText());
-            
-            double targetP = Double.parseDouble(probField.getText());
-            
-            ERFOption selectedERF = (ERFOption) erfCombo.getSelectedItem();
-            String erfClass = selectedERF.getClassName();
+        plotPanel.clear();
+        
+        setStage(Stage.IDLE);
+        setStage(Stage.PARSING_INPUTS);
 
-            GMMOption selectedGMM = (GMMOption) gmmCombo.getSelectedItem();
-            AttenRelRef gmm = selectedGMM.getRef();
-            
-            IMTOption imtOption = (IMTOption) imtCombo.getSelectedItem();
-            String imtString = imtOption.getImtString();
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
 
-            System.out.println("Running with:");
-            System.out.println("Age = " + age + "ka");
-            System.out.println("ERF = " + erfClass);
-            System.out.println("GMM = " + gmm);
-            System.out.println("P = " + targetP);
-            
-            plotPanel.clear();
+            // store computed results as fields of the anonymous worker
+            AssetHazardRecord hazard;
+            PBRSurvivalAsset asset;
+            double hazardFactor;
 
-            logResult(" New Calculation");
-            logResult("================================");
-            logResult(" Hazard");
-            logResult("    ERF = " + selectedERF);
-            logResult("    GMM = " + gmm);
-            logResult(String.format(
-                    "    Lat, Lon = (%.5f, %.5f), Vs30 = %.0f",
-                    lat, lon, vs30
-            ));
-            logResult("---------------------------------------------------------");
-            logResult(" Fragility");
-            logResult("    Age = " + age+ "ka");
-            logResult("    IMT = " + imtString);
-            logResult("    Median = " + median + " [g]");
-            logResult("    LogStdDev = " + beta);
-            
-            
-         // ---------------- build fragility model ----------------
-            LimitState ls = LimitState.TOPPLE;
-            FragilityModel fragility =
-                    FragilityBuilder.component(fragilityID)
-                            .imtString(imtString)
-                            .lognormal(ls, median, beta)
-                            .build();
-            List<FragilityModel> models = new ArrayList<>();
-            models.add(fragility);
+            @Override
+            protected Void doInBackground() throws Exception {
 
-            // ---------------- wrap into fragility library sequence ----------------
-            Metadata metadata = new Metadata.Builder()
-                    .build();
-            ResponseModelLibrary<FragilityModel> baseFragilityLib =
-                    ResponseModelLibrary.of(models, metadata);
-            
-            PrepareSpec spec = PrepareSpec.builder()
-            		.build();
-            SimpleImResponseLibrary fragilityLib = SimpleImFragilityLibraryPreparer.prepare(baseFragilityLib, spec);
-            
-            // -------------  build asset into portfolio -----------------------------           
-            Map<String, String> additional = new LinkedHashMap<>();
-            additional.put("age", String.valueOf(age));
-            List<FragilityAsset> assets = List.of(new FragilityAsset(
-                    assetID,
-                    lat,
-                    lon,
-                    vs30,
-                    fragilityID,
-                    additional
-            ));
-            Portfolio<FragilityAsset> basePortfolio =
-                    new Portfolio<>(assets, List.of(), metadata);
-            RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, fragilityLib);
-            
-            
-            // build ERF
-            AbstractERF erf = buildERF(erfClass);
-            erf.getTimeSpan().setDuration(1.0);
-            erf.updateForecast();
-            
-            
-            // -------------- calculator ---------
-            PortfolioRiskConvolutionCalculator calculator =
-                    new PortfolioRiskConvolutionCalculator(
-                            riskConvolutionPortfolio,
-                            fragilityLib,
-                            gmm,
-                            erf
-                    );
-            riskConvolutionPortfolio = calculator.computeRiskConvolution();
-            if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
-                throw new IllegalStateException("Risk convolution did not complete correctly.");
-            }
-            
-            PBRSurvivalPortfolioReporter PBRreporter = new PBRSurvivalPortfolioReporter(riskConvolutionPortfolio);
-            PBRSurvivalAsset asset = PBRreporter.getAssetByID(assetID);
+                String assetID = "GUI_Asset";
+                String fragilityID = "GUI_Fragility";
+                
+                setStage(Stage.PARSING_INPUTS);
 
-            AssetHazardRecord hazard = riskConvolutionPortfolio.getHazardForAsset(assetID);
-            plotPanel.addCurve(
-                    hazard.imls,
-                    hazard.poe,
-                    "Computed hazard"
-                    );
-            
-            // adjusted hazard
-            double hazardFactor = asset.getHazardAdjustment(targetP);
-            double[] scaledPoe = new double[hazard.poe.length];
+                double lat = Double.parseDouble(latField.getText());
+                double lon = Double.parseDouble(lonField.getText());
+                double vs30 = Double.parseDouble(vs30Field.getText());
 
-            for (int i = 0; i < hazard.poe.length; i++) {
-                scaledPoe[i] = hazard.poe[i] * hazardFactor;
+                double age = Double.parseDouble(ageField.getText());
+                double median = Double.parseDouble(medianField.getText());
+                double beta = Double.parseDouble(betaField.getText());
+                double targetP = Double.parseDouble(probField.getText());
+
+                ERFOption selectedERF = (ERFOption) erfCombo.getSelectedItem();
+                GMMOption selectedGMM = (GMMOption) gmmCombo.getSelectedItem();
+                IMTOption imtOption = (IMTOption) imtCombo.getSelectedItem();
+
+                String erfClass = selectedERF.getClassName();
+                AttenRelRef gmm = selectedGMM.getRef();
+                String imtString = imtOption.getImtString();
+                
+                setStage(Stage.BUILDING_MODELS);
+
+                FragilityModel fragility =
+                        FragilityBuilder.component(fragilityID)
+                                .imtString(imtString)
+                                .lognormal(LimitState.TOPPLE, median, beta)
+                                .build();
+
+                ResponseModelLibrary<FragilityModel> baseFragilityLib =
+                        ResponseModelLibrary.of(List.of(fragility), new Metadata.Builder().build());
+
+                SimpleImResponseLibrary fragilityLib =
+                        SimpleImFragilityLibraryPreparer.prepare(
+                                baseFragilityLib,
+                                PrepareSpec.builder().build()
+                        );
+                
+                setStage(Stage.BUILDING_PORTFOLIO);
+
+                List<FragilityAsset> assets = List.of(new FragilityAsset(
+                        assetID, lat, lon, vs30, fragilityID,
+                        Map.of("age", String.valueOf(age))
+                ));
+
+                Portfolio<FragilityAsset> basePortfolio =
+                        new Portfolio<>(assets, List.of(), new Metadata.Builder().build());
+
+                RiskConvolutionPortfolio riskPortfolio =
+                        new RiskConvolutionPortfolio(basePortfolio, fragilityLib);
+
+                setStage(Stage.BUILDING_ERF);
+                
+                AbstractERF erf = buildERF(erfClass);
+                erf.getTimeSpan().setDuration(1.0);
+                erf.updateForecast();
+                
+                setStage(Stage.ASSESSING_RISK);
+
+                PortfolioRiskConvolutionCalculator calculator =
+                        new PortfolioRiskConvolutionCalculator(
+                                riskPortfolio,
+                                fragilityLib,
+                                gmm,
+                                erf
+                        );
+
+                riskPortfolio = calculator.computeRiskConvolution();
+
+                setStage(Stage.POST_PROCESSING);
+                
+                PBRSurvivalPortfolioReporter reporter =
+                        new PBRSurvivalPortfolioReporter(riskPortfolio);
+
+                asset = reporter.getAssetByID(assetID);
+                hazard = riskPortfolio.getHazardForAsset(assetID);
+
+                hazardFactor = asset.getHazardAdjustment(targetP);
+
+                return null;
             }
 
-            plotPanel.addCurve(
-                    hazard.imls,
-                    scaledPoe,
-                    String.format("Adjusted hazard (x %.2e)", hazardFactor)
-            );
-            
-            System.out.printf(
-                    "Hazard adjustment: %.6f%n",
-                    hazardFactor
-            );
+            @Override
+            protected void done() {
+            	
+            	setStage(Stage.COMPLETE);
 
-            logResult("---------------------------------------------------------");
-            logResult(" Results");
-            logResult(String.format(
-                    "    Annual probability of failure = %.2e",
-                    asset.getAnnualProbabilityOfFailure()
-            ));
+                // ---------------- PLOT ----------------
+                plotPanel.addCurve(
+                        hazard.imls,
+                        hazard.poe,
+                        "Computed hazard"
+                );
 
-            logResult(String.format(
-                    "    Probability of survival over %.0f ka = %.2e",
-                    asset.getAge() / 1000,
-                    asset.getProbabilityOfSurvival()
-            ));
+                double[] scaled = new double[hazard.poe.length];
+                for (int i = 0; i < scaled.length; i++) {
+                    scaled[i] = hazard.poe[i] * hazardFactor;
+                }
 
-            logResult("    Hazard adjustment factor, alpha:");
+                plotPanel.addCurve(
+                        hazard.imls,
+                        scaled,
+                        String.format("Adjusted hazard (×%.2e)", hazardFactor)
+                );
 
-            logResult(String.format(
-                    "         for Target P(survive)=%.2f, alpha = %.2e",
-                    targetP,
-                    asset.getHazardAdjustment(targetP)
-            ));
-            logResult("");
-            logResult("");
+                // ---------------- ORIGINAL LOG BLOCK (RESTORED) ----------------
+                logResult(" New Calculation");
+                logResult("================================");
+                logResult(" Hazard");
+                logResult("    ERF = " + erfCombo.getSelectedItem());
+                logResult("    GMM = " + gmmCombo.getSelectedItem());
+                logResult(String.format(
+                        "    Lat, Lon = (%.5f, %.5f), Vs30 = %.0f",
+                        Double.parseDouble(latField.getText()),
+                        Double.parseDouble(lonField.getText()),
+                        Double.parseDouble(vs30Field.getText())
+                ));
+                logResult("---------------------------------------------------------");
+                logResult(" Fragility");
+                logResult("    Age = " + ageField.getText() + "ka");
+                logResult("    IMT = " + imtCombo.getSelectedItem());
+                logResult("    Median = " + medianField.getText() + " [g]");
+                logResult("    LogStdDev = " + betaField.getText());
 
+                // ---------------- RESULTS ----------------
+                logResult("---------------------------------------------------------");
+                logResult(" Results");
 
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    ex.getMessage(),
-                    "Input error",
-                    JOptionPane.ERROR_MESSAGE
-            );
-        }
+                logResult(String.format(
+                        "    Annual probability of failure = %.2e",
+                        asset.getAnnualProbabilityOfFailure()
+                ));
+
+                logResult(String.format(
+                        "    Probability of survival over %.0f ka = %.2e",
+                        asset.getAge() / 1000,
+                        asset.getProbabilityOfSurvival()
+                ));
+
+                logResult(String.format(
+                        "    Hazard adjustment factor = %.2e",
+                        hazardFactor
+                ));
+                
+                logResult("");
+                logResult("");
+            }
+        };
+
+        worker.execute();
     }
     
     private AbstractERF buildERF(String className) throws Exception {
@@ -587,6 +610,10 @@ public class PBRAppUI extends JFrame {
     
     private static class PlotPanel extends JPanel {
 
+        // ============================================================
+        // Curve container
+        // ============================================================
+
         private static class Curve {
             final double[] x;
             final double[] y;
@@ -601,9 +628,13 @@ public class PBRAppUI extends JFrame {
 
         private final List<Curve> curves = new ArrayList<>();
 
-        // log-space bounds
+        // log10 bounds
         private double minX, maxX;
         private double minY, maxY;
+
+        // ============================================================
+        // Public API
+        // ============================================================
 
         public void addCurve(double[] x, double[] y, String label) {
             curves.add(new Curve(x, y, label));
@@ -620,9 +651,10 @@ public class PBRAppUI extends JFrame {
             repaint();
         }
 
-        // ------------------------------------------------------------
-        // Bounds in LOG space
-        // ------------------------------------------------------------
+        // ============================================================
+        // Compute log bounds
+        // ============================================================
+
         private void recomputeBounds() {
 
             minX = Double.POSITIVE_INFINITY;
@@ -656,27 +688,26 @@ public class PBRAppUI extends JFrame {
             maxY = Math.ceil(maxY);
         }
 
-        // ------------------------------------------------------------
-        // transforms (LOG → SCREEN)
-        // ------------------------------------------------------------
+        // ============================================================
+        // Coordinate transforms (LOG → SCREEN)
+        // ============================================================
+
         private int xToScreen(double x, int w, int left, int right) {
             double lx = Math.log10(x);
-            return (int) (left + (lx - minX) / (maxX - minX) * (w - left - right));
+            return (int)(left +
+                    (lx - minX)/(maxX - minX)*(w - left - right));
         }
 
         private int yToScreen(double y, int h, int top, int bottom) {
             double ly = Math.log10(y);
-            return (int) (h - bottom - (ly - minY) / (maxY - minY) * (h - top - bottom));
+            return (int)(h - bottom -
+                    (ly - minY)/(maxY - minY)*(h - top - bottom));
         }
 
-        private double screenToYLog(int y, int h, int top, int bottom) {
-            double frac = (double)(h - bottom - y) / (h - top - bottom);
-            return minY + frac * (maxY - minY);
-        }
+        // ============================================================
+        // Painting
+        // ============================================================
 
-        // ------------------------------------------------------------
-        // paint
-        // ------------------------------------------------------------
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -690,41 +721,57 @@ public class PBRAppUI extends JFrame {
             int w = getWidth();
             int h = getHeight();
 
-            int left = 70;
-            int bottom = 50;
-            int top = 20;
-            int right = 20;
+            // -------- AXIS GEOMETRY (single source of truth) --------
+            int left   = 75;
+            int right  = 20;
+            int top    = 20;
+            int bottom = 55;
 
             drawAxes(g2, w, h, left, right, top, bottom);
+            
+            int plotBottom = h - bottom;
+            int plotTop = top;
+            
+            int labelX = left + 10;
+            int labelBaseY = (int) (plotBottom - 0.1 * (plotBottom - plotTop));
+            
+            // -------- Draw curves --------
+            FontMetrics fm = g2.getFontMetrics();
+            int lineHeight = fm.getHeight();
+            	
+        	for (int j = 0; j < curves.size(); j++) {
+        	    Curve c = curves.get(j);
 
-            int colorStep = 0;
-
-            for (Curve c : curves) {
-
-                g2.setColor(Color.getHSBColor(colorStep / 10f, 0.8f, 0.9f));
-                colorStep++;
+                g2.setColor(Color.getHSBColor(j / 10f, 0.8f, 0.9f));
 
                 for (int i = 1; i < c.x.length; i++) {
 
-                    if (c.x[i - 1] <= 0 || c.y[i - 1] <= 0) continue;
-                    if (c.x[i] <= 0 || c.y[i] <= 0) continue;
+                    if (c.x[i-1] <= 0 || c.y[i-1] <= 0) continue;
+                    if (c.x[i]   <= 0 || c.y[i]   <= 0) continue;
 
-                    int x1 = xToScreen(c.x[i - 1], w, left, right);
-                    int x2 = xToScreen(c.x[i], w, left, right);
+                    int x1 = xToScreen(c.x[i-1], w, left, right);
+                    int x2 = xToScreen(c.x[i],   w, left, right);
 
-                    int y1 = yToScreen(c.y[i - 1], h, top, bottom);
-                    int y2 = yToScreen(c.y[i], h, top, bottom);
+                    int y1 = yToScreen(c.y[i-1], h, top, bottom);
+                    int y2 = yToScreen(c.y[i],   h, top, bottom);
 
                     g2.drawLine(x1, y1, x2, y2);
                 }
 
-                g2.drawString(c.label, w / 2, top + 15 * colorStep);
+                int labelY = labelBaseY + (j * lineHeight);
+                g2.drawString(
+                        c.label,
+                        labelX,
+                        labelY
+                );
+
             }
         }
 
-        // ------------------------------------------------------------
-        // AXES
-        // ------------------------------------------------------------
+        // ============================================================
+        // Axes + ticks
+        // ============================================================
+
         private void drawAxes(Graphics2D g2, int w, int h,
                               int left, int right, int top, int bottom) {
 
@@ -737,58 +784,108 @@ public class PBRAppUI extends JFrame {
             g2.drawLine(x0, y0, w - right, y0);
             g2.drawLine(x0, y0, x0, top);
 
-            // --------------------------------------------------------
-            // X ticks (log)
-            // --------------------------------------------------------
-            for (int p = (int) minX; p <= (int) maxX; p++) {
+            FontMetrics fm = g2.getFontMetrics();
+
+            // ---------------- X ticks ----------------
+            for (int p = (int)minX; p <= (int)maxX; p++) {
 
                 double val = Math.pow(10, p);
                 int x = xToScreen(val, w, left, right);
 
                 g2.drawLine(x, y0, x, y0 + 5);
-                g2.drawString("10^" + p, x - 10, y0 + 20);
+
+                String label = "10^" + p;
+                int lw = fm.stringWidth(label);
+
+                g2.drawString(label, x - lw/2, y0 + 20);
             }
 
-            // --------------------------------------------------------
-            // Y ticks (log) — FIXED ALIGNMENT
-            // --------------------------------------------------------
-            for (int p = (int) minY; p <= (int) maxY; p++) {
+            // ---------------- Y ticks (AXIS-LOCKED) ----------------
+            for (int p = (int)minY; p <= (int)maxY; p++) {
 
                 double val = Math.pow(10, p);
                 int y = yToScreen(val, h, top, bottom);
 
                 g2.drawLine(x0 - 5, y, x0, y);
 
-                // IMPORTANT: anchor text to tick position, not constant offset
-                g2.drawString("10^" + p, 5, y + 5);
+                String label = "10^" + p;
+                int lw = fm.stringWidth(label);
+
+                g2.drawString(
+                        label,
+                        x0 - 8 - lw,
+                        y + fm.getAscent()/2 - 2
+                );
             }
 
-            // labels
-            g2.drawString("IML (g)", w / 2, h - 10);
+            // axis labels
+            g2.drawString("Intensity Level (g)", w/2 - 20, h - 10);
 
-            drawRotatedYLabel(g2, "PoE", top, h, 15);
+            drawRotatedYLabel(g2, "Annual Probability of Exceedance", left, top, h);
         }
 
-        // ------------------------------------------------------------
-        // rotated Y label
-        // ------------------------------------------------------------
-        private void drawRotatedYLabel(Graphics2D g2, String text,
-                                       int top, int h, int leftMargin) {
+        // ============================================================
+        // Rotated Y label
+        // ============================================================
+
+        private void drawRotatedYLabel(Graphics2D g2,
+                                       String text,
+                                       int left,
+                                       int top,
+                                       int h) {
 
             AffineTransform old = g2.getTransform();
 
             FontMetrics fm = g2.getFontMetrics();
             int textWidth = fm.stringWidth(text);
 
-            g2.rotate(-Math.PI / 2);
+            g2.rotate(-Math.PI/2);
 
             g2.drawString(
                     text,
-                    -(top + (h - top) / 2 + textWidth / 2),
-                    leftMargin
+                    -(top + (h - top)/2 + textWidth/2),
+                    left - 45
             );
 
             g2.setTransform(old);
+        }
+    }
+    
+    private void setStage(Stage stage) {
+        progressLabel.setText(stage.label);
+
+        switch (stage) {
+            case IDLE -> {
+                progressBar.setIndeterminate(false);
+                progressBar.setValue(0);
+            }
+            case PARSING_INPUTS -> progressBar.setIndeterminate(true);
+            case BUILDING_MODELS -> progressBar.setIndeterminate(true);
+            case BUILDING_PORTFOLIO -> progressBar.setIndeterminate(true);
+            case BUILDING_ERF -> progressBar.setIndeterminate(true);
+            case ASSESSING_RISK -> progressBar.setIndeterminate(true);
+            case POST_PROCESSING -> progressBar.setIndeterminate(true);
+            case COMPLETE -> {
+                progressBar.setIndeterminate(false);
+                progressBar.setValue(100);
+            }
+        }
+    }
+    
+    private enum Stage {
+        IDLE("Idle"),
+        PARSING_INPUTS("Reading inputs..."),
+        BUILDING_MODELS("Building models..."),
+        BUILDING_PORTFOLIO("Building portfolio..."),
+        BUILDING_ERF("Building ERF..."),
+        ASSESSING_RISK("Assessing risk..."),
+        POST_PROCESSING("Post-processing..."),
+        COMPLETE("Complete");
+
+        final String label;
+
+        Stage(String label) {
+            this.label = label;
         }
     }
 

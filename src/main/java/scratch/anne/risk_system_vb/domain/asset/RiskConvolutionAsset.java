@@ -2,6 +2,7 @@ package scratch.anne.risk_system_vb.domain.asset;
 
 import java.util.Map;
 
+import scratch.anne.risk_system_vb.engine.convolution.ConvolutionResult;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 
 public abstract class RiskConvolutionAsset extends AbstractAsset {
@@ -19,8 +20,8 @@ public abstract class RiskConvolutionAsset extends AbstractAsset {
     
     private ImKey imKey;
 
-    public abstract void setRiskConvolutionResult(double v);
-    public abstract double getRiskConvolutionResult();
+    public abstract void setRiskConvolutionResult(ConvolutionResult result);
+    public abstract ConvolutionResult getRiskConvolutionResult();
     
     
     public ImKey getImKey() {

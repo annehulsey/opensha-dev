@@ -1,6 +1,7 @@
 package scratch.anne.risk_system_vb.domain.asset.fragility;
 
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
+import scratch.anne.risk_system_vb.engine.convolution.ConvolutionResult;
 
 public class PBRSurvivalAsset extends RiskConvolutionAsset {
 
@@ -65,13 +66,13 @@ public class PBRSurvivalAsset extends RiskConvolutionAsset {
 
     
     @Override
-    public void setRiskConvolutionResult(double v) {
+    public void setRiskConvolutionResult(ConvolutionResult result) {
         throw new UnsupportedOperationException(
             "PBRSurvivalAsset does not support setting a risk convolution result");
     }
 
     @Override
-    public double getRiskConvolutionResult() {
+    public ConvolutionResult getRiskConvolutionResult() {
         throw new UnsupportedOperationException(
             "PBRSurvivalAsset does not expose a risk convolution result");
     }
