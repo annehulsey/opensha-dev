@@ -4,11 +4,25 @@
 
 apply plugin: 'java-library'
 
+
 ext {
     parentProject = 'opensha'
 }
 
 apply from: '../opensha/build-common.gradle'
+
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "gradle.plugin.com.github.johnrengelman:shadow:7.1.2"
+    }
+}
+
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
 
 dependencies {
 
@@ -26,4 +40,20 @@ dependencies {
     implementation project(path: ':opensha', configuration: 'implResolvable')
 
     testImplementation 'junit:junit:4.13.2'
+}
+
+application {
+    mainClass = 'scratch.anne.risk_system_vb.gui.PBRAppUI'
+}
+
+shadowJar {
+    archiveBaseName.set("PBRcalculator")
+    archiveClassifier.set("")
+    archiveVersion.set("")
+
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass
+        )
+    }
 }

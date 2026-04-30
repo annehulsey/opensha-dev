@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 
 import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
@@ -31,10 +30,8 @@ import scratch.anne.risk_system_vb.domain.structural_response.fragilities.Simple
 import scratch.anne.risk_system_vb.domain.structural_response.fragilities.SimpleImFragilityLibraryPreparer.PrepareSpec;
 import scratch.anne.risk_system_vb.engine.convolution.ConvolutionResult;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
-import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.Metadata;
 import scratch.anne.risk_system_vb.util.StringUtil;
-import scratch.anne.risk_system_vb.util.NumericUtil;
 
 public class PBRAppUI extends JFrame {
 	
@@ -58,7 +55,7 @@ public class PBRAppUI extends JFrame {
 	private JTextField probField;
 	
 	// --- Output ---
-	private HazardPlotPanel plotPanel;
+	private PlotPanel plotPanel;
 	private JTextArea resultsText;
 	
 	private JProgressBar progressBar;
@@ -197,7 +194,7 @@ public class PBRAppUI extends JFrame {
     // ---------- Panels ----------
 
     private JPanel createPlotPanel() {
-        plotPanel = new HazardPlotPanel();
+        plotPanel = new PlotPanel();
         plotPanel.setBorder(new TitledBorder(new EtchedBorder(), "Results Plot"));
         return plotPanel;
     }
@@ -453,24 +450,6 @@ public class PBRAppUI extends JFrame {
             	
             	setStage(Stage.COMPLETE);
 
-                // ---------------- PLOT ----------------
-//                plotPanel.addCurve(
-//                        hazard.imls,
-//                        hazard.poe,
-//                        "Computed hazard"
-//                );
-//
-//                double[] scaled = new double[hazard.poe.length];
-//                for (int i = 0; i < scaled.length; i++) {
-//                    scaled[i] = hazard.poe[i] * hazardFactor;
-//                }
-//
-//                plotPanel.addCurve(
-//                        hazard.imls,
-//                        scaled,
-//                        String.format("Adjusted hazard (×%.2e)", hazardFactor)
-//                );
-
                 // ---------------- ORIGINAL LOG BLOCK (RESTORED) ----------------
                 logResult(" New Calculation");
                 logResult("================================");
@@ -608,248 +587,6 @@ public class PBRAppUI extends JFrame {
         resultsText.setCaretPosition(resultsText.getDocument().getLength());
     }
     
-    private static class PlotPanel extends JPanel {
-
-        // ============================================================
-        // Curve container
-        // ============================================================
-
-        private static class Curve {
-            final double[] x;
-            final double[] y;
-            final String label;
-
-            Curve(double[] x, double[] y, String label) {
-                this.x = x;
-                this.y = y;
-                this.label = label;
-            }
-        }
-
-        private final List<Curve> curves = new ArrayList<>();
-
-        // log10 bounds
-        private double minX, maxX;
-        private double minY, maxY;
-
-        // ============================================================
-        // Public API
-        // ============================================================
-
-        public void addCurve(double[] x, double[] y, String label) {
-            curves.add(new Curve(x, y, label));
-            recomputeBounds();
-            repaint();
-        }
-
-        public void clear() {
-            curves.clear();
-            minX = Double.POSITIVE_INFINITY;
-            maxX = Double.NEGATIVE_INFINITY;
-            minY = Double.POSITIVE_INFINITY;
-            maxY = Double.NEGATIVE_INFINITY;
-            repaint();
-        }
-
-        // ============================================================
-        // Compute log bounds
-        // ============================================================
-
-        private void recomputeBounds() {
-
-            minX = Double.POSITIVE_INFINITY;
-            maxX = Double.NEGATIVE_INFINITY;
-            minY = Double.POSITIVE_INFINITY;
-            maxY = Double.NEGATIVE_INFINITY;
-
-            for (Curve c : curves) {
-                for (int i = 0; i < c.x.length; i++) {
-
-                    double x = c.x[i];
-                    double y = c.y[i];
-
-                    if (x <= 0 || y <= 0) continue;
-
-                    double lx = Math.log10(x);
-                    double ly = Math.log10(y);
-
-                    minX = Math.min(minX, lx);
-                    maxX = Math.max(maxX, lx);
-                    minY = Math.min(minY, ly);
-                    maxY = Math.max(maxY, ly);
-                }
-            }
-
-            if (!Double.isFinite(minX)) return;
-
-            minX = Math.floor(minX);
-            maxX = Math.ceil(maxX);
-            minY = Math.floor(minY);
-            maxY = Math.ceil(maxY);
-        }
-
-        // ============================================================
-        // Coordinate transforms (LOG → SCREEN)
-        // ============================================================
-
-        private int xToScreen(double x, int w, int left, int right) {
-            double lx = Math.log10(x);
-            return (int)(left +
-                    (lx - minX)/(maxX - minX)*(w - left - right));
-        }
-
-        private int yToScreen(double y, int h, int top, int bottom) {
-            double ly = Math.log10(y);
-            return (int)(h - bottom -
-                    (ly - minY)/(maxY - minY)*(h - top - bottom));
-        }
-
-        // ============================================================
-        // Painting
-        // ============================================================
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-
-            if (curves.isEmpty()) return;
-
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                    RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int w = getWidth();
-            int h = getHeight();
-
-            // -------- AXIS GEOMETRY (single source of truth) --------
-            int left   = 75;
-            int right  = 20;
-            int top    = 20;
-            int bottom = 55;
-
-            drawAxes(g2, w, h, left, right, top, bottom);
-            
-            int plotBottom = h - bottom;
-            int plotTop = top;
-            
-            int labelX = left + 10;
-            int labelBaseY = (int) (plotBottom - 0.1 * (plotBottom - plotTop));
-            
-            // -------- Draw curves --------
-            FontMetrics fm = g2.getFontMetrics();
-            int lineHeight = fm.getHeight();
-            	
-        	for (int j = 0; j < curves.size(); j++) {
-        	    Curve c = curves.get(j);
-
-                g2.setColor(Color.getHSBColor(j / 10f, 0.8f, 0.9f));
-
-                for (int i = 1; i < c.x.length; i++) {
-
-                    if (c.x[i-1] <= 0 || c.y[i-1] <= 0) continue;
-                    if (c.x[i]   <= 0 || c.y[i]   <= 0) continue;
-
-                    int x1 = xToScreen(c.x[i-1], w, left, right);
-                    int x2 = xToScreen(c.x[i],   w, left, right);
-
-                    int y1 = yToScreen(c.y[i-1], h, top, bottom);
-                    int y2 = yToScreen(c.y[i],   h, top, bottom);
-
-                    g2.drawLine(x1, y1, x2, y2);
-                }
-
-                int labelY = labelBaseY + (j * lineHeight);
-                g2.drawString(
-                        c.label,
-                        labelX,
-                        labelY
-                );
-
-            }
-        }
-
-        // ============================================================
-        // Axes + ticks
-        // ============================================================
-
-        private void drawAxes(Graphics2D g2, int w, int h,
-                              int left, int right, int top, int bottom) {
-
-            g2.setColor(Color.BLACK);
-
-            int x0 = left;
-            int y0 = h - bottom;
-
-            // axes
-            g2.drawLine(x0, y0, w - right, y0);
-            g2.drawLine(x0, y0, x0, top);
-
-            FontMetrics fm = g2.getFontMetrics();
-
-            // ---------------- X ticks ----------------
-            for (int p = (int)minX; p <= (int)maxX; p++) {
-
-                double val = Math.pow(10, p);
-                int x = xToScreen(val, w, left, right);
-
-                g2.drawLine(x, y0, x, y0 + 5);
-
-                String label = "10^" + p;
-                int lw = fm.stringWidth(label);
-
-                g2.drawString(label, x - lw/2, y0 + 20);
-            }
-
-            // ---------------- Y ticks (AXIS-LOCKED) ----------------
-            for (int p = (int)minY; p <= (int)maxY; p++) {
-
-                double val = Math.pow(10, p);
-                int y = yToScreen(val, h, top, bottom);
-
-                g2.drawLine(x0 - 5, y, x0, y);
-
-                String label = "10^" + p;
-                int lw = fm.stringWidth(label);
-
-                g2.drawString(
-                        label,
-                        x0 - 8 - lw,
-                        y + fm.getAscent()/2 - 2
-                );
-            }
-
-            // axis labels
-            g2.drawString("Intensity Level (g)", w/2 - 20, h - 10);
-
-            drawRotatedYLabel(g2, "Annual Probability of Exceedance", left, top, h);
-        }
-
-        // ============================================================
-        // Rotated Y label
-        // ============================================================
-
-        private void drawRotatedYLabel(Graphics2D g2,
-                                       String text,
-                                       int left,
-                                       int top,
-                                       int h) {
-
-            AffineTransform old = g2.getTransform();
-
-            FontMetrics fm = g2.getFontMetrics();
-            int textWidth = fm.stringWidth(text);
-
-            g2.rotate(-Math.PI/2);
-
-            g2.drawString(
-                    text,
-                    -(top + (h - top)/2 + textWidth/2),
-                    left - 45
-            );
-
-            g2.setTransform(old);
-        }
-    }
     
     public class PlotData {
 
@@ -956,7 +693,7 @@ public class PBRAppUI extends JFrame {
     }
     
     
-    private static class HazardPlotPanel extends JPanel {
+    private static class PlotPanel extends JPanel {
 
         /* ============================================================
          *                        AXIS MODEL
@@ -1011,13 +748,12 @@ public class PBRAppUI extends JFrame {
             return Color.getHSBColor(c.index / 10f, 0.8f, 0.9f);
         }
 
-        private final int leftMargin   = 90;
-        private final int rightMargin  = 90;
+        private final int leftMargin   = 80;
+        private final int rightMargin  = 60;
         private final int topMargin    = 40;
-        private final int bottomMargin = 70;
+        private final int bottomMargin = 50;
 
-        public HazardPlotPanel() {
-//            setBackground(Color.WHITE);
+        public PlotPanel() {
         }
 
         /* ============================================================
@@ -1045,7 +781,7 @@ public class PBRAppUI extends JFrame {
             curves.add(new Curve(
                     data.imls,
                     data.poeOriginal,
-                    "Hazard",
+                    "Computed Hazard",
                     0,
                     YAxis.LEFT_LOG,
                     null   // dynamic
@@ -1119,8 +855,8 @@ public class PBRAppUI extends JFrame {
 
             /* ---------------- labels ---------------- */
 
-            drawLeftLabel(g2, "Annual Probability of Exceedance");
-            drawRightLabel(g2, "Fragility");
+            drawLeftLabel(g2, "Annual Probability of Exceedance", L, T, B);
+            drawRightLabel(g2, "P (Collapse | IML)", R, T, B, w);
             drawXLabel(g2,
                     "Intensity Measure Level (g)",
                     L, R, B);
@@ -1341,36 +1077,54 @@ public class PBRAppUI extends JFrame {
          *                        LABELS
          * ============================================================ */
 
-        private void drawLeftLabel(Graphics2D g, String text) {
-            drawRotatedLabel(g, text, 20);
-        }
-
-        private void drawRightLabel(Graphics2D g, String text) {
-            drawRotatedLabel(g, text, getWidth() - 20);
-        }
-
-        private void drawRotatedLabel(Graphics2D g,
+        private void drawLeftLabel(Graphics2D g,
 			                String text,
-			                int x) {
+			                int L,
+			                int T,
+			                int B) {
 			
 			AffineTransform old = g.getTransform();
 			FontMetrics fm = g.getFontMetrics();
 			
-			g.setColor(Color.BLACK); // enforce semantic rule
+			g.setColor(Color.BLACK);
 			
-			// ALWAYS 90° counterclockwise
 			g.rotate(-Math.PI / 2);
 			
-		    int textWidth = fm.stringWidth(text);
-		    int centerY = getHeight() / 2;
+			int textWidth = fm.stringWidth(text);
+			int centerY = T + (B - T) / 2;
+			
+			// IMPORTANT: push outside plot area, not onto axis
+			int x = -(centerY + textWidth / 2);
+			int y = L - 50;   // <-- increased gutter beyond tick labels
+			
+			g.drawString(text, x, y);
+			
+			g.setTransform(old);
+		}
 
-		    g.drawString(
-		            text,
-		            -centerY - textWidth / 2,
-		            x
-		    );
+        private void drawRightLabel(Graphics2D g,
+                String text,
+                int R,
+                int T,
+                int B,
+                int w) {
 
-		    g.setTransform(old);
+			AffineTransform old = g.getTransform();
+			FontMetrics fm = g.getFontMetrics();
+			
+			g.setColor(Color.BLACK);
+			
+			g.rotate(-Math.PI / 2);
+			
+			int textWidth = fm.stringWidth(text);
+			int centerY = T + (B - T) / 2;
+			
+			int x = -(centerY + textWidth / 2);
+			int y = R + 40;  
+			
+			g.drawString(text, x, y);
+			
+			g.setTransform(old);
 		}
         
         private void drawXLabel(Graphics2D g,
