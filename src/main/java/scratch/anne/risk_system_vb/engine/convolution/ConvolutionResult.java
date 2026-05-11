@@ -2,11 +2,13 @@ package scratch.anne.risk_system_vb.engine.convolution;
 
 public class ConvolutionResult {
 
+	public final double[] imls;
     public final double risk;
     public final double[] disaggContribution;
     public final double[] disaggCumulative;
 
-    public ConvolutionResult(double risk, double[] disaggContribution) {
+    public ConvolutionResult(double[] imls, double[] disaggContribution, double risk) {
+    	this.imls = imls;
         this.risk = risk;
         this.disaggContribution = disaggContribution.clone();
         this.disaggCumulative = buildCumulative(this.disaggContribution);

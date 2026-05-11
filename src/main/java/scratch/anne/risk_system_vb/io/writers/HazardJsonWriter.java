@@ -22,7 +22,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * <pre>
  * {"lat":39.7,"lon":-105.2,"vs30":760,"imt":"PGA",
  *  "imls":[...],
- *  "poe":[...]}
+ *  "hazard":[...]}
  * </pre>
   */
 public class HazardJsonWriter implements AutoCloseable {
@@ -140,7 +140,7 @@ public class HazardJsonWriter implements AutoCloseable {
         json.imt = r.imKey.getImtString();
 
         json.imls = x;
-        json.poe = r.y;
+        json.hazard = r.y;
 
         writer.write(gson.toJson(json));
         writer.write("\n");
@@ -159,7 +159,7 @@ public class HazardJsonWriter implements AutoCloseable {
         String imt;
 
         double[] imls;
-        double[] poe;
+        double[] hazard;
     }
 
     private static class Record {

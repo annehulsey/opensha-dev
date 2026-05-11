@@ -91,16 +91,16 @@ public class RiskConvolution {
      * Constructor that builds an internal SimpleImResponse  from raw IM and response arrays,
      * along with a hazard array. Integration method defaults to RIEMANN if not specified.
      *
-     * @param im       Intensity measure array
+     * @param imls       Intensity measure array
      * @param fim      Response-as-a-function-of-im array
      * @param hazard   Hazard values corresponding to IMs
      * @param method   Integration method; if null, defaults to RIEMANN
      */
-    public RiskConvolution(double[] im, double[] fim, double[] hazard, IntegrationMethod method) {
-        if (im.length != fim.length || im.length != hazard.length) {
+    public RiskConvolution(double[] imls, double[] fim, double[] hazard, IntegrationMethod method) {
+        if (imls.length != fim.length || imls.length != hazard.length) {
             throw new IllegalArgumentException("IM, F(IM), and hazard arrays must all be the same length");
         }
-        this.response = new SimpleImResponseFunction(im, fim);
+        this.response = new SimpleImResponseFunction(imls, fim);
         this.hazardValues = hazard.clone();
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
     }
@@ -109,12 +109,12 @@ public class RiskConvolution {
      * Convenience constructor that builds a vulnerability from IM/response arrays
      * and uses default RIEMANN integration method.
      *
-     * @param im     Intensity measure array
+     * @param imls     Intensity measure array
      * @param fim      Response-as-a-function-of-im array
      * @param hazard Hazard array
      */
-    public RiskConvolution(double[] im, double[] fim, double[] hazardValues) {
-        this(im, fim, hazardValues, null);
+    public RiskConvolution(double[] imls, double[] fim, double[] hazardValues) {
+        this(imls, fim, hazardValues, null);
     }
 
     /**
@@ -149,12 +149,12 @@ public class RiskConvolution {
      * Builds SimpleImResponse internally; hazard must be supplied later via compute().
      * Integration method defaults to RIEMANN if not specified.
      *
-     * @param im      Intensity measure array
+     * @param imls      Intensity measure array
      * @param fim     Response-as-a-function-of-im array
      * @param method  Integration method; if null, defaults to RIEMANN
      */
-    public RiskConvolution(double[] im, double[] fim, IntegrationMethod method) {
-        this(new SimpleImResponseFunction(im, fim), method);
+    public RiskConvolution(double[] imls, double[] fim, IntegrationMethod method) {
+        this(new SimpleImResponseFunction(imls, fim), method);
     }
 
     /**
@@ -162,11 +162,11 @@ public class RiskConvolution {
      * Builds SimpleImResponse internally; hazard must be supplied later via compute().
      * Integration method defaults to RIEMANN.
      *
-     * @param im      Intensity measure array
+     * @param imls      Intensity measure array
      * @param fim     Response-as-a-function-of-im array
      */
-    public RiskConvolution(double[] im, double[] fim) {
-        this.response = new SimpleImResponseFunction(im, fim);
+    public RiskConvolution(double[] imls, double[] fim) {
+        this.response = new SimpleImResponseFunction(imls, fim);
         this.hazardValues = null;
         this.method = null;
     }
@@ -214,6 +214,7 @@ public class RiskConvolution {
     // ---------------------- Core Riemann Integration ----------------------
     private ConvolutionResult computeRiemann(double[] hazard) {
         
+    	double[] imls = response.getImValues();
         double[] respMid = response.getRespMid();
         int n = respMid.length;
         
@@ -231,20 +232,20 @@ public class RiskConvolution {
         contribution[n - 1] = respMid[n - 1] * hazardValues[n - 1];
         risk += contribution[n - 1];
 
-        return new ConvolutionResult(risk, contribution);
+        return new ConvolutionResult(imls, contribution, risk);
     }
 
 
     // ---------------------- Porter Closed-Form Integration ----------------------
     private ConvolutionResult computeClosedForm(double[] hazardValues) {
-        double[] iml = response.getImValues();
+        double[] imls = response.getImValues();
         double[] respEdge = response.getRespEdges();
 
         double risk = 0.0;
-        double[] contribution = new double[iml.length];
+        double[] contribution = new double[imls.length];
 
-        for (int i = 1; i < iml.length; i++) {
-            double imlDelta = iml[i] - iml[i - 1];
+        for (int i = 1; i < imls.length; i++) {
+            double imlDelta = imls[i] - imls[i - 1];
             double respDelta = respEdge[i] - respEdge[i - 1];
 
             double g = Math.log(hazardValues[i] / hazardValues[i - 1]) / imlDelta;
@@ -260,7 +261,7 @@ public class RiskConvolution {
             }
         }
 
-        return new ConvolutionResult(risk, contribution);
+        return new ConvolutionResult(imls, contribution, risk);
     }
     
 
