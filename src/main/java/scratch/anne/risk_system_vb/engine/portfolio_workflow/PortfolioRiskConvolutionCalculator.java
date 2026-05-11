@@ -29,9 +29,6 @@ import scratch.anne.risk_system_vb.util.enums.IMT;
  * Portfolio-level calculator that computes hazard curves per (SiteKey, ImKey)
  * and propagates them into risk integral calculations.
  *
- * <p>Includes an optional hazard trace writer that streams
- * hazard curves to CSV for debugging and reproducibility.</p>
- *
  * <h2>Design</h2>
  * <ul>
  *   <li>Hazard computation is parallelized by site</li>
@@ -88,14 +85,12 @@ public class PortfolioRiskConvolutionCalculator {
     /**
      * Main computation entry point.
      * 
-     * Compute expected loss for all assets in the portfolio.
+     * Compute risk convolution for all assets in the portfolio.
      * Uses parallel execution per site.
      *
-     * <p>Hazard curves are computed per (SiteKey, ImKey),
-     * optionally written to CSV, and immediately consumed
-     * by the risk integrator.</p>
+     * <p>Hazard curves are computed per (SiteKey, ImKey)</p>
      *
-     * @return portfolio with computed expected losses
+     * @return portfolio with computed risk
      */
     public RiskConvolutionPortfolio computeRiskConvolution() {
 
@@ -181,7 +176,7 @@ public class PortfolioRiskConvolutionCalculator {
                         );
 
 
-                        // ---- Compute normalized expected loss per asset ---
+                        // ---- Compute risk per asset ---
                         for (RiskConvolutionAsset asset :
                                 riskConvolutionPortfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
 

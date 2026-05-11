@@ -61,9 +61,8 @@ public class LJBPortfolioPFail {
         // ------------------- 3. Output paths inside run folder -------------------
         String fileTag = config.getOrDefault("file_tag", runFolder.getFileName().toString());
         Path outputCSV = runFolder.resolve(fileTag + ".csv");
-        Path groupedOutputCSV = runFolder.resolve(fileTag + "_grouped.csv");
         Path hazardJson = writeHazard
-                ? runFolder.resolve(fileTag + "_hazard.json")
+                ? runFolder.resolve(fileTag + "_hazard-list.json")
                 : null;
 
         String erfClassName = config.get("erf_class");
