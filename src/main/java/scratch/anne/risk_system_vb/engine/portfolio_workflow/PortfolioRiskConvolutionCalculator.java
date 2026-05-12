@@ -16,110 +16,158 @@ import org.opensha.sha.imr.ScalarIMR;
 import org.opensha.sha.imr.param.IntensityMeasureParams.PeriodParam;
 
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
-import scratch.anne.risk_system_vb.domain.hazard.HazardResult;
+import scratch.anne.risk_system_vb.domain.hazard.HazardCurve;
+import scratch.anne.risk_system_vb.domain.hazard.HazardCurveCollection;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
-import scratch.anne.risk_system_vb.util.StringUtil.ImtPeriod;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
+import scratch.anne.risk_system_vb.util.StringUtil.ImtPeriod;
 import scratch.anne.risk_system_vb.util.enums.IMT;
 
 /**
- * Portfolio-level calculator that computes hazard curves per (SiteKey, ImKey)
- * and propagates them into risk integral calculations.
+ * Two-stage portfolio-level workflow:
  *
- * <h2>Design</h2>
+ * <pre>
+ * Stage 1: Hazard field computation
+ *   (SiteKey × ImKey → HazardResult)
+ *
+ * Stage 2: Risk convolution
+ *   (Asset + Hazard field → ConvolutionResult)
+ * </pre>
+ *
+ * <h2>Design principles</h2>
  * <ul>
- *   <li>Hazard computation is parallelized by site</li>
- *   <li>Risk computation is performed immediately after hazard computation</li>
- *   <li>Hazard curves are stored in the portfolio
+ *   <li>Hazard is computed once and cached at portfolio level</li>
+ *   <li>Risk is a deterministic transform over stored hazard</li>
+ *   <li>Parallelization is performed at SiteKey level</li>
+ *   <li>IM consistency is guaranteed via ImKey (not raw arrays)</li>
  * </ul>
- *
  */
 public class PortfolioRiskConvolutionCalculator {
 
-    private final RiskConvolutionPortfolio riskConvolutionPortfolio;
+    private final RiskConvolutionPortfolio portfolio;
     private final SimpleImResponseLibrary responseLib;
     private final AttenRelRef gmmRef;
     private final AbstractERF erf;
+    private final HazardMetric hazardMetric;
     private final RiskConvolution.IntegrationMethod integrationMethod;
 
-    /**
-     * Full constructor with optional hazard JSON output.
-     *
-     * @param riskConvolutionPortfolio portfolio
-     * @param responseLib simple response library
-     * @param gmmRef GMPE reference
-     * @param erf earthquake rupture forecast
-     * @param integrationMethod integration method
-     */
+    /** true once hazard field is fully computed */
+    private boolean hazardComputed = false;
+    HazardCurveCollection hazardCurves;
+    
+    private boolean riskComputed = false;
+
+    /** full constructor */
     public PortfolioRiskConvolutionCalculator(
-    		RiskConvolutionPortfolio riskConvolutionPortfolio,
+            RiskConvolutionPortfolio portfolio,
+            SimpleImResponseLibrary responseLib,
+            AttenRelRef gmmRef,
+            AbstractERF erf,
+            HazardMetric hazardMetric,
+            RiskConvolution.IntegrationMethod integrationMethod
+    ) {
+        this.portfolio = portfolio;
+        this.responseLib = responseLib;
+        this.gmmRef = gmmRef;
+        this.erf = erf;
+        this.hazardMetric = hazardMetric;
+        this.integrationMethod = integrationMethod;
+    }
+
+    /** default integration method */
+    public PortfolioRiskConvolutionCalculator(
+            RiskConvolutionPortfolio portfolio,
+            SimpleImResponseLibrary responseLib,
+            AttenRelRef gmmRef,
+            AbstractERF erf,
+            HazardMetric hazardMetric
+    ) {
+        this(portfolio, responseLib, gmmRef, erf, 
+        		hazardMetric,
+                RiskConvolution.IntegrationMethod.CLOSED_FORM);
+    }
+    
+    /** default hazard metric */
+    public PortfolioRiskConvolutionCalculator(
+            RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
             AttenRelRef gmmRef,
             AbstractERF erf,
             RiskConvolution.IntegrationMethod integrationMethod
     ) {
-        this.riskConvolutionPortfolio = riskConvolutionPortfolio;
-        this.responseLib = responseLib;
-        this.gmmRef = gmmRef;
-        this.erf = erf;
-        this.integrationMethod = integrationMethod;
-
-    }
-
-    /**
-     * Convenience constructor (default integration).
-     */
+        this(portfolio, responseLib, gmmRef, erf, 
+        		HazardMetric.PROBABILITY_EXCEEDANCE,
+                integrationMethod);
+    }    
+    
+    /** default hazard metric and integration method */
     public PortfolioRiskConvolutionCalculator(
-    		RiskConvolutionPortfolio riskConvolutionPortfolio,
+            RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
             AttenRelRef gmmRef,
             AbstractERF erf
     ) {
-        this(riskConvolutionPortfolio, responseLib, gmmRef, erf,
+        this(portfolio, responseLib, gmmRef, erf, 
+        		HazardMetric.PROBABILITY_EXCEEDANCE,
                 RiskConvolution.IntegrationMethod.CLOSED_FORM);
     }
 
-    /**
-     * Main computation entry point.
-     * 
-     * Compute risk convolution for all assets in the portfolio.
-     * Uses parallel execution per site.
-     *
-     * <p>Hazard curves are computed per (SiteKey, ImKey)</p>
-     *
-     * @return portfolio with computed risk
-     */
-    public RiskConvolutionPortfolio computeRiskConvolution() {
+    // ============================================================
+    // STAGE 1 — HAZARD FIELD COMPUTATION
+    // ============================================================
 
-    	// ---- Prepare hazard calculators and GMM deque ----
+    /**
+     * Computes and stores hazard curves for all (SiteKey, ImKey) pairs.
+     *
+     * <p>This method is parallelized over SiteKey. Each thread:
+     * <ul>
+     *   <li>constructs site-specific GMM state</li>
+     *   <li>loops over IM keys for that site</li>
+     *   <li>computes hazard curves</li>
+     *   <li>stores results in portfolio hazard cache</li>
+     * </ul>
+     *
+     * <p>After execution, hazardCurves becomes immutable input for risk stage.</p>
+     */
+    public void computeHazardCurves() {
+    	
+    	beginHazardComputation();
+
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
         ArrayDeque<HazardCurveCalculator> calcDeque = new ArrayDeque<>();
 
-        ScalarIMR gmm0 = gmmRef.get();
-        
-        // Build sites from ELossPortfolio site keys
-        List<SiteKey> siteKeys = new ArrayList<>(riskConvolutionPortfolio.getSiteKeys());
+        ScalarIMR baseGmm = gmmRef.get();
+
+        List<SiteKey> siteKeys = new ArrayList<>(portfolio.getSiteKeys());
+
+        int totalCurves = countTotalHazardCurves();
+        AtomicInteger counter = new AtomicInteger();
+
+        long startTime = System.nanoTime();
+
         List<Site> sites = new ArrayList<>();
+
         for (SiteKey siteKey : siteKeys) {
+
             Site site = new Site(new Location(siteKey.getLat(), siteKey.getLon()));
-            for (Parameter<?> param : gmm0.getSiteParams()) {
-                site.addParameter((Parameter<?>) param.clone());
-            }
+
+            for (Parameter<?> p : baseGmm.getSiteParams())
+                site.addParameter((Parameter<?>) p.clone());
+
             @SuppressWarnings("unchecked")
-            Parameter<Double> vs30Param =
+            Parameter<Double> gmmVs30 =
                     (Parameter<Double>) site.getParameter("Vs30");
-            vs30Param.setValue(siteKey.getVs30());
+
+            gmmVs30.setValue(siteKey.getVs30());
+
             sites.add(site);
         }
 
-        AtomicInteger counter = new AtomicInteger(0);
-        int total = sites.size();
-        long startTime = System.nanoTime();
-
-        // ---- Parallel computation per site ----
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (int i = 0; i < sites.size(); i++) {
@@ -133,11 +181,11 @@ public class PortfolioRiskConvolutionCalculator {
                 HazardCurveCalculator calc = null;
 
                 try {
-                	// thread-local GMM
+
                     synchronized (gmmDeque) {
                         gmm = gmmDeque.isEmpty() ? gmmRef.get() : gmmDeque.pop();
                     }
-                    // thread-local hazard calculator
+
                     synchronized (calcDeque) {
                         calc = calcDeque.isEmpty()
                                 ? new HazardCurveCalculator()
@@ -146,70 +194,55 @@ public class PortfolioRiskConvolutionCalculator {
 
                     gmm.setSite(site);
 
-                    // ---- Get IMKey groups per site from lower-level portfolio ----
-                    for (ImKey imKey : riskConvolutionPortfolio.getImKeysBySite(siteKey)) {
+                    for (ImKey imKey : portfolio.getImKeysBySite(siteKey)) {
 
-                        // get IM parameters for gmm
-                    	ImtPeriod imtPeriod = imKey.getImtPeriod();
-                    	gmm.setIntensityMeasure(imtPeriod.imt.name());
-                    	if (imtPeriod.imt == IMT.SA) {
-                    	    gmm.getParameter(PeriodParam.NAME).setValue(imtPeriod.period);
-                    	}
+                        ImtPeriod imt = imKey.getImtPeriod();
+                        gmm.setIntensityMeasure(imt.imt.name());
 
-                        // Build hazard curve im values
-                        DiscretizedFunc hazFunc = new ArbitrarilyDiscretizedFunc();
-                        for (double x : imKey.getLogValues()) {
+                        if (imt.imt == IMT.SA)
+                            gmm.getParameter(PeriodParam.NAME)
+                                    .setValue(imt.period);
+
+                        DiscretizedFunc hazFunc =
+                                new ArbitrarilyDiscretizedFunc();
+
+                        for (double x : imKey.getLogValues())
                             hazFunc.set(x, 0d);
-                        }
 
-                        hazFunc = calc.getHazardCurve(hazFunc, site, gmm, erf);
+                        hazFunc =
+                                calc.getHazardCurve(hazFunc, site, gmm, erf);
 
-                        double[] hazardY = new double[hazFunc.size()];
-                        for (int j = 0; j < hazFunc.size(); j++) {
-                            hazardY[j] = hazFunc.getY(j);
-                        }
-                        
-                        riskConvolutionPortfolio.storeHazard(
+                        double[] hazard = new double[hazFunc.size()];
+                        for (int j = 0; j < hazard.length; j++)
+                            hazard[j] = hazFunc.getY(j);
+
+                        hazardCurves.put(
                                 siteKey,
                                 imKey,
-                                new HazardResult(hazardY)
+                                new HazardCurve(hazard)
                         );
 
+                        // ----- PROGRESS -----
+                        int done = counter.incrementAndGet();
 
-                        // ---- Compute risk per asset ---
-                        for (RiskConvolutionAsset asset :
-                                riskConvolutionPortfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
+                        if (done % 100 == 0 || done == totalCurves) {
 
-                            RiskConvolution calcRisk = new RiskConvolution(
-                                    responseLib.getByName(asset.getModelName()),
-                                    hazardY,
-                                    integrationMethod
+                            long now = System.nanoTime();
+                            double elapsed = (now - startTime) / 1e9;
+                            double rate = done / elapsed;
+                            double eta = (totalCurves - done) / rate;
+
+                            System.out.printf(
+                                    "Hazard %d / %d (%.1f%%) | %.1f curves/s | ETA %.1fs%n",
+                                    done,
+                                    totalCurves,
+                                    100.0 * done / totalCurves,
+                                    rate,
+                                    eta
                             );
-
-                            asset.setRiskConvolutionResult(calcRisk.compute());
                         }
                     }
 
-                    // ---- Progress update ----
-                    int count = counter.incrementAndGet();
-                    if (count % 100 == 0 || count == total) {
-                        long now = System.nanoTime();
-                        double elapsedSec = (now - startTime) / 1e9;
-                        double rate = count / elapsedSec;
-                        double remaining = (total - count) / rate;
-
-                        System.out.printf(
-                                "Processed %d / %d (%.1f%%) | %.1f sites/s | ETA %.1fs%n",
-                                count, total,
-                                100.0 * count / total,
-                                rate,
-                                remaining
-                        );
-                    }
-
-                } catch (Exception e) {
-                    System.err.println("Exception for site " + siteKey);
-                    e.printStackTrace();
                 } finally {
                     if (gmm != null) synchronized (gmmDeque) { gmmDeque.push(gmm); }
                     if (calc != null) synchronized (calcDeque) { calcDeque.push(calc); }
@@ -217,12 +250,121 @@ public class PortfolioRiskConvolutionCalculator {
             }));
         }
 
-        // Wait for completion
-        for (CompletableFuture<Void> f : futures) f.join();
+        futures.forEach(CompletableFuture::join);
 
-        riskConvolutionPortfolio.setRiskConvolutionComputed(true);
-        return riskConvolutionPortfolio;
+        hazardCurves.freeze();
+        portfolio.setHazardCurves(hazardCurves);
+        hazardComputed = true;
+        
+        portfolio.setHazardComputed(hazardComputed);
     }
     
-   
+    private int countTotalHazardCurves() {
+
+        int total = 0;
+
+        for (SiteKey siteKey : portfolio.getSiteKeys()) {
+            total += portfolio.getImKeysBySite(siteKey).size();
+        }
+
+        return total;
+    }
+
+    // ============================================================
+    // STAGE 2 — RISK CONVOLUTION
+    // ============================================================
+
+    /**
+     * Computes risk convolution using precomputed hazard field.
+     *
+     * <p>Requires {@link #computeHazardField()} to be executed first.</p>
+     *
+     * <p>Parallelized over SiteKey. Each site consumes cached hazard only.</p>
+     */
+    public void computeRiskConvolution() {
+
+        if (!hazardComputed) {
+            throw new IllegalStateException(
+                    "Hazard field must be computed before risk convolution.");
+        }
+
+        HazardCurveCollection hazards = portfolio.getHazardCurves();
+
+        int totalAssets = portfolio.getAssets().size();
+        AtomicInteger counter = new AtomicInteger();
+
+        long startTime = System.nanoTime();
+
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        hazards.forEachCurve((siteKey, imKey, hazard) -> {
+
+            futures.add(CompletableFuture.runAsync(() -> {
+
+                double[] hazardY = hazard.getHazard();
+
+                for (RiskConvolutionAsset asset :
+                        portfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
+
+                    RiskConvolution riskCalc = new RiskConvolution(
+                            responseLib.getByName(asset.getModelName()),
+                            hazardY,
+                            integrationMethod
+                    );
+
+                    asset.setRiskConvolutionResult(riskCalc.compute());
+
+                int done = counter.incrementAndGet();
+
+                if (done % 100 == 0 || done == totalAssets) {
+
+                    long now = System.nanoTime();
+                    double elapsed = (now - startTime) / 1e9;
+
+                    double rate = done / elapsed;
+                    double eta = (totalAssets - done) / rate;
+
+                    System.out.printf(
+                            "Risk %d / %d (%.1f%%) | %.1f assets/s | ETA %.1fs%n",
+                            done,
+                            totalAssets,
+                            100.0 * done / totalAssets,
+                            rate,
+                            eta
+                    );
+                }
+                }
+            }));
+        });
+
+        futures.forEach(CompletableFuture::join);
+
+        riskComputed = true;
+        portfolio.setRiskConvolutionComputed(true);
+    }
+
+
+    private void beginHazardComputation() {
+
+        hazardComputed = false;
+
+        HazardParameters params =
+                new HazardParameters(
+                        erf.getName(),
+                        erf.getTimeSpan().getDuration(),
+                        hazardMetric,
+                        gmmRef.name()
+                );
+
+        hazardCurves = new HazardCurveCollection(params);
+    }
+
+    /**
+     * Convenience method for full pipeline execution.
+     */
+    public RiskConvolutionPortfolio computeRisk() {
+        computeHazardCurves();
+        computeRiskConvolution();
+        return portfolio;
+    }
 }

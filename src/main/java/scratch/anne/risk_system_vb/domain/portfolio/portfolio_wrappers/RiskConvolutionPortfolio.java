@@ -6,13 +6,14 @@ import scratch.anne.risk_system_vb.domain.asset.fragility.FailureProbabilityAsse
 import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.VulnerabilityAsset;
-import scratch.anne.risk_system_vb.domain.hazard.AssetHazardRecord;
-import scratch.anne.risk_system_vb.domain.hazard.HazardRecord;
-import scratch.anne.risk_system_vb.domain.hazard.HazardResult;
+import scratch.anne.risk_system_vb.domain.hazard.AssetHazardCurve;
+import scratch.anne.risk_system_vb.domain.hazard.HazardCurve;
+import scratch.anne.risk_system_vb.domain.hazard.HazardCurveCollection;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponse;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
+import scratch.anne.risk_system_vb.io.writers.HazardCurvesExporter;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.Metadata;
@@ -20,6 +21,7 @@ import scratch.anne.risk_system_vb.util.PortfolioGroupingUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.nio.file.Path;
 
 import org.apache.commons.lang3.function.TriConsumer;
 
@@ -62,14 +64,14 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
 
     private final Metadata metadata;
 
+    private boolean hazardComputed;
     private boolean riskConvolutionComputed;
     
 	 // ---------------------------------------------------------------------
-	 // Hazard results (computed state)
+	 // Hazard curves (computed state)
 	 // ---------------------------------------------------------------------
 	
-	 private final Map<SiteKey, Map<ImKey, HazardResult>> hazardResults =
-	         new LinkedHashMap<>();
+    private HazardCurveCollection hazardCurves;
 
     // ---------------------------------------------------------------------
     // Construction
@@ -82,8 +84,8 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
         Objects.requireNonNull(base);
         Objects.requireNonNull(responseLibrary);
 
+        this.hazardComputed = false;
         this.riskConvolutionComputed = false;
-        // TODO track hazard duration in risk convolution results
 
         // Build IM lookup: modelName → IMKey
         Map<String, ImKey> responseToIm = new HashMap<>();
@@ -250,6 +252,14 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
     public void setRiskConvolutionComputed(boolean computed) {
         this.riskConvolutionComputed = computed;
     }
+    
+    public boolean isHazardComputed() {
+        return hazardComputed;
+    }
+
+    public void setHazardComputed(boolean computed) {
+        this.hazardComputed = computed;
+    }
 
     // ---------------------------------------------------------------------
     // PortfolioGetters
@@ -359,72 +369,51 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
     
-    // ----- hazard storage helpers ---------
-    public void storeHazard(
-            SiteKey siteKey,
-            ImKey imKey,
-            HazardResult result
-    ) {
-        hazardResults
-            .computeIfAbsent(siteKey, s -> new LinkedHashMap<>())
-            .put(imKey, result);
+    // ----- hazard storage helpers ---------   
+    public void setHazardCurves(HazardCurveCollection curves) {
+        this.hazardCurves = curves;
     }
     
     
-    public Map<SiteKey, Map<ImKey, HazardResult>> getHazardResults() {
-        return Collections.unmodifiableMap(hazardResults);
+    public HazardCurveCollection getHazardCurves() {
+        return hazardCurves;
     }
     
-    public void forEachHazard(
-            TriConsumer<SiteKey, ImKey, HazardResult> consumer) {
-
-        hazardResults.forEach((site, imMap) ->
-            imMap.forEach((im, result) ->
-                consumer.accept(site, im, result)
-            )
-        );
-    }
     
-    public List<HazardRecord> getHazardRecords() {
-
-        List<HazardRecord> out = new ArrayList<>();
-
-        hazardResults.forEach((site, imMap) -> {
-            imMap.forEach((im, result) -> {
-                out.add(new HazardRecord(site, im, result));
-            });
-        });
-
-        return List.copyOf(out);
+    public void exportHazard(Path file) {
+        new HazardCurvesExporter()
+                .export(hazardCurves, file);
     }
+
     
-    public AssetHazardRecord getHazardForAsset(String id) {
-    	
-    	RiskConvolutionAsset asset = assetsById.get(id);
+    public AssetHazardCurve getHazardForAsset(String id) {
+
+        RiskConvolutionAsset asset = assetsById.get(id);
 
         SiteKey siteKey = siteKeyByAsset.get(asset);
         if (siteKey == null) {
-            throw new IllegalArgumentException("Unknown asset: " + asset.getAssetID());
+            throw new IllegalArgumentException(
+                    "Unknown asset: " + asset.getAssetID());
         }
 
         ImKey imKey = imKeyByAsset.get(asset);
         if (imKey == null) {
-            throw new IllegalStateException("No IMKey for asset: " + asset.getAssetID());
-        }
-
-        HazardResult hazardResult = hazardResults
-                .getOrDefault(siteKey, Map.of())
-                .get(imKey);
-
-        if (hazardResult == null) {
             throw new IllegalStateException(
-                    "No hazard stored for asset " + asset.getAssetID()
-            );
+                    "No IMKey for asset: " + asset.getAssetID());
         }
 
-        double[] imls = imKey.getLinearValues();
-        double[] poe = hazardResult.getProbabilities();
+        HazardCurve curve = hazardCurves.get(siteKey, imKey);
 
-        return new AssetHazardRecord(siteKey, imKey, imls, poe);
+        if (curve == null) {
+            throw new IllegalStateException(
+                    "No hazard stored for asset " + asset.getAssetID());
+        }
+
+        return new AssetHazardCurve(
+                siteKey,
+                imKey,
+                imKey.getLinearValues(),
+                curve.getHazard()
+        );
     }
 }
