@@ -19,7 +19,6 @@ import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
-import scratch.anne.risk_system_vb.io.writers.HazardJsonWriter;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 import scratch.anne.risk_system_vb.util.IO;
 
@@ -141,14 +140,11 @@ public class PortfolioExpectedLossCalcByCSV {
                 );
 
         // ------------------- 11. Compute Expected Loss -------------------
-        riskConvolutionPortfolio = calculator.computeRiskConvolution();
+        riskConvolutionPortfolio = calculator.computeRisk();
         if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
             throw new IllegalStateException("Risk convolution did not complete correctly.");
         }
-        try (HazardJsonWriter writer =
-		   new HazardJsonWriter(hazardJson)) {
-        		writer.writePortfolio(riskConvolutionPortfolio);
-		}
+        riskConvolutionPortfolio.exportHazard(hazardJson);
         
         ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
         aggregator.printSummary();

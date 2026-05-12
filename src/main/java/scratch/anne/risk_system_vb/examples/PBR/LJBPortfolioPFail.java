@@ -2,16 +2,13 @@ package scratch.anne.risk_system_vb.examples.PBR;
 
 import java.nio.file.*;
 import java.util.*;
-import java.io.*;
 
 import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
 
 import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
-import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.ExpectedLossPortfolioAggregator;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.PBRSurvivalPortfolioReporter;
-import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.ProbFailurePortfolioReporter;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.structural_response.ResponseModelLibrary;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
@@ -21,7 +18,6 @@ import scratch.anne.risk_system_vb.domain.structural_response.fragilities.Simple
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
-import scratch.anne.risk_system_vb.io.writers.HazardJsonWriter;
 import scratch.anne.risk_system_vb.io.readers.FragilityLibraryReader;
 import scratch.anne.risk_system_vb.io.InputConfigUtil;
 import scratch.anne.risk_system_vb.util.IO;
@@ -140,14 +136,11 @@ public class LJBPortfolioPFail {
                 );
 
         // ------------------- 11. Compute Probability of Failure -------------------
-        riskConvolutionPortfolio = calculator.computeRiskConvolution();
+        riskConvolutionPortfolio = calculator.computeRisk();
         if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
             throw new IllegalStateException("Risk convolution did not complete correctly.");
         }
-        try (HazardJsonWriter writer =
-		   new HazardJsonWriter(hazardJson)) {
-        		writer.writePortfolio(riskConvolutionPortfolio);
-		}
+        riskConvolutionPortfolio.exportHazard(hazardJson);
         
 	    // ------------------- 12. Write PBR outputs to run folder -------------------
 	    PBRSurvivalPortfolioReporter PBRreporter = new PBRSurvivalPortfolioReporter(riskConvolutionPortfolio, probabilityTargets);

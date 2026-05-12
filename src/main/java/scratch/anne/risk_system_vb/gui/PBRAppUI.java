@@ -15,7 +15,7 @@ import org.opensha.sha.imr.AttenRelRef;
 
 import scratch.anne.risk_system_vb.util.enums.IMT;
 import scratch.anne.risk_system_vb.util.enums.LimitState;
-import scratch.anne.risk_system_vb.domain.hazard.AssetHazardRecord;
+import scratch.anne.risk_system_vb.domain.hazard.AssetHazardCurve;
 import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.domain.asset.fragility.PBRSurvivalAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
@@ -346,7 +346,7 @@ public class PBRAppUI extends JFrame {
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
 
             // store computed results as fields of the anonymous worker
-            AssetHazardRecord hazard;
+            AssetHazardCurve hazard;
             FragilityModel baseFragility;
             SimpleImResponse fragility; 
             PBRSurvivalAsset asset;
@@ -424,7 +424,7 @@ public class PBRAppUI extends JFrame {
                                 erf
                         );
 
-                riskPortfolio = calculator.computeRiskConvolution();
+                riskPortfolio = calculator.computeRisk();
 
                 setStage(Stage.POST_PROCESSING);
                 
@@ -603,19 +603,19 @@ public class PBRAppUI extends JFrame {
         public final double[] disaggCumulative;
         public final double[] disaggBounds;
 
-        public PlotData(AssetHazardRecord hazard,
+        public PlotData(AssetHazardCurve hazard,
         				SimpleImResponse fragility,
                         double hazFactor,
                         ConvolutionResult riskResult,
                         double[] disaggMarkerValues) {
         	
             this.imls = hazard.imls;
-            this.poeOriginal = hazard.poe;
+            this.poeOriginal = hazard.hazard;
             this.hazardFactor = hazFactor;
 
             this.poeAdjusted = new double[hazard.imls.length];
 	            for (int i = 0; i < poeAdjusted.length; i++) {
-	            	poeAdjusted[i] = hazard.poe[i] * hazardFactor;
+	            	poeAdjusted[i] = hazard.hazard[i] * hazardFactor;
 	            }
 
             this.fragilityProbability = fragility.getRespEdges();
@@ -627,7 +627,7 @@ public class PBRAppUI extends JFrame {
                     disaggMarkerValues);
         }
         
-        public PlotData(AssetHazardRecord hazard,
+        public PlotData(AssetHazardCurve hazard,
 				SimpleImResponse fragility,
                 double hazFactor,
                 ConvolutionResult riskResult
