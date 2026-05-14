@@ -43,9 +43,9 @@ public class SimpleImResponse extends AbstractSimpleImResponse implements NamedR
     // Constructor: full control, specify IM domain
     // ------------------------------------------------------------------------
     public SimpleImResponse(String name, IMT imt, Double period,
-                                 double[] imValues, double[] damageRatioEdges,
+                                 double[] imValues, double[] responseEdges,
                                  ImKey.ImDomain domain) {
-        super(imValues, damageRatioEdges);
+        super(imValues, responseEdges);
         this.name = name;
         this.imt = imt;
         this.period = period;
@@ -72,8 +72,8 @@ public class SimpleImResponse extends AbstractSimpleImResponse implements NamedR
     // Convenience constructor: assume log-transformed IM values
     // ------------------------------------------------------------------------
     public SimpleImResponse(String name, IMT imt, Double period,
-                                 double[] imValues, double[] damageRatioEdges) {
-        this(name, imt, period, imValues, damageRatioEdges, ImKey.ImDomain.LOG_IM);
+                                 double[] imValues, double[] responseEdges) {
+        this(name, imt, period, imValues, responseEdges, ImKey.ImDomain.LOG_IM);
     }
 
     // ------------------------------------------------------------------------

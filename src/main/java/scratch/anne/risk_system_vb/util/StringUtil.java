@@ -70,4 +70,12 @@ public class StringUtil {
             );
         }
     }
+    
+    
+    public static double parseDoubleOrDefault(String s, double defaultVal) {
+        if (s == null || s.isBlank()) {
+            return defaultVal;
+        }
+        return Double.parseDouble(s.trim());
+    }
 }

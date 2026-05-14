@@ -208,10 +208,27 @@ public class PortfolioRiskConvolutionCalculator {
 
                         for (double x : imKey.getLogValues())
                             hazFunc.set(x, 0d);
+                       
+                        
+                        hazFunc = calc.getHazardCurve(hazFunc, site, gmm, erf);
 
-                        hazFunc =
-                                calc.getHazardCurve(hazFunc, site, gmm, erf);
+                        switch (hazardMetric) {
 
+                            case PROBABILITY_EXCEEDANCE:
+                                // already correct
+                                break;
+
+                            case RATE_EXCEEDANCE:
+                                // rate over full ERF duration (not annualized)
+                                hazFunc = calc.getAnnualizedRates(hazFunc, 1.0);
+                                break;
+
+                            default:
+                                throw new IllegalArgumentException(
+                                    "Hazard metric not supported for risk convolution class: " + hazardMetric
+                                );
+                        }
+                        
                         double[] hazard = new double[hazFunc.size()];
                         for (int j = 0; j < hazard.length; j++)
                             hazard[j] = hazFunc.getY(j);

@@ -8,6 +8,7 @@ import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
 
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.VulnerabilityAsset;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.ExpectedLossPortfolioAggregator;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
@@ -20,6 +21,7 @@ import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvol
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
+import scratch.anne.risk_system_vb.util.StringUtil;
 import scratch.anne.risk_system_vb.util.IO;
 
 /**
@@ -68,12 +70,12 @@ public class PortfolioExpectedLossCalcByCSV {
 
         String erfClassName = config.get("erf_class");
         String gmmName = config.get("gmm");
-        String integrationMethod = config.getOrDefault("integration_method", "CLOSED_FORM");
-        // Read the logImStep, defaulting to NaN if not provided
-        String logImStepStr = config.get("log_im_step");
-        double logImStep = (logImStepStr == null || logImStepStr.isBlank())
-                ? Double.NaN
-                : Double.parseDouble(logImStepStr);
+        
+        HazardMetric hazardMetric = parseHazardMetric(config.get("hazard_metric"));
+        double erfDuration = StringUtil.parseDoubleOrDefault(config.get("erf_duration"), 1.0);
+        
+        RiskConvolution.IntegrationMethod integrationMethod = parseIntegrationMethod(config.get("integration_method"));
+        double logImStep = StringUtil.parseDoubleOrDefault(config.get("log_im_step"), Double.NaN);
         
         // ------------ VERIFY ERF and GMM EXIST -------------------
         try {
@@ -117,26 +119,22 @@ public class PortfolioExpectedLossCalcByCSV {
                         .getDeclaredConstructor()
                         .newInstance();
 
-        erf.getTimeSpan().setDuration(1.0);
+        erf.getTimeSpan().setDuration(erfDuration);
         erf.updateForecast();
 
         // ------------------- 9. Dynamic attenuation relation -------------------
         AttenRelRef gmm =
                 AttenRelRef.valueOf(gmmName.toUpperCase());
 
-        // ------------------- 10. Create calculator -------------------
-        RiskConvolution.IntegrationMethod integrationMethodEnum =
-                "RIEMANN".equalsIgnoreCase(integrationMethod)
-                        ? RiskConvolution.IntegrationMethod.RIEMANN
-                        : RiskConvolution.IntegrationMethod.CLOSED_FORM;
-        
+        // ------------------- 10. Create calculator -------------------       
         PortfolioRiskConvolutionCalculator calculator =
                 new PortfolioRiskConvolutionCalculator(
                         riskConvolutionPortfolio,
                         expVulnLib,
                         gmm,
                         erf,
-                        integrationMethodEnum
+                        hazardMetric,
+                        integrationMethod
                 );
 
         // ------------------- 11. Compute Expected Loss -------------------
@@ -175,5 +173,46 @@ public class PortfolioExpectedLossCalcByCSV {
         }
         return map;
     }
+    
+    public static HazardMetric parseHazardMetric(String s) {
+
+        if (s == null || s.isBlank())
+            return HazardMetric.PROBABILITY_EXCEEDANCE;
+
+        String key = s.trim().toUpperCase();
+
+        switch (key) {
+
+            // ---- probability aliases ----
+            case "PROB":
+            case "PROBABILITY":
+            case "PROBABILITY_EXCEEDANCE":
+                return HazardMetric.PROBABILITY_EXCEEDANCE;
+
+            // ---- rate aliases ----
+            case "RATE":
+            case "RATE_EXCEEDANCE":
+                return HazardMetric.RATE_EXCEEDANCE;
+
+            default:
+                // still allow exact enum names
+                try {
+                    return HazardMetric.valueOf(key);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                        "Unknown hazard metric: " + s 
+                    );
+                }
+        }
+    }
+    
+    public static RiskConvolution.IntegrationMethod parseIntegrationMethod(String s) {
+        if (s == null || s.isBlank()) {
+            return RiskConvolution.IntegrationMethod.CLOSED_FORM;
+        }
+
+        return RiskConvolution.IntegrationMethod.valueOf(s.trim().toUpperCase());
+    }
+
 
 }
