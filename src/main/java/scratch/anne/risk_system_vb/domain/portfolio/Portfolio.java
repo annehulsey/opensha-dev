@@ -13,8 +13,8 @@ import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
  * Immutable canonical portfolio.
  *
  * <p>
- * Holds assets and deterministic structural groupings derived solely from
- * asset data. This class MUST remain free of execution, hazard, or risk logic.
+ * Holds assets and deterministic structural groupings derived from
+ * asset data.
  * </p>
  *
  * <p>
