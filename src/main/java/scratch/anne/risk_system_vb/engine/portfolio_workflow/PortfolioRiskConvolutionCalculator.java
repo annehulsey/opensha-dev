@@ -199,9 +199,29 @@ public class PortfolioRiskConvolutionCalculator {
                         ImtPeriod imt = imKey.getImtPeriod();
                         gmm.setIntensityMeasure(imt.imt.name());
 
-                        if (imt.imt == IMT.SA)
-                            gmm.getParameter(PeriodParam.NAME)
-                                    .setValue(imt.period);
+                        if (imt.imt == IMT.SA) {
+//                            gmm.getParameter(PeriodParam.NAME)
+//                                    .setValue(imt.period);
+                        
+                        	// work around for invalid period value
+                        	// snap to nearest valid value
+                        	//TODO find better solution for invalid gmm periods
+                        	Parameter<Double> p =
+                        	    (Parameter<Double>) gmm.getParameter(PeriodParam.NAME);
+
+                        	var constraint =
+                        	    (org.opensha.commons.param.constraint.impl.DoubleDiscreteConstraint)
+                        	        p.getConstraint();
+
+                        	double requested = imt.period;
+
+                        	double allowed =
+                        	    constraint.getAllowedDoubles().stream()
+                        	        .min(Comparator.comparing(d -> Math.abs(d - requested)))
+                        	        .orElseThrow();
+
+                        	p.setValue(allowed);
+                        }
 
                         DiscretizedFunc hazFunc =
                                 new ArbitrarilyDiscretizedFunc();
@@ -219,7 +239,7 @@ public class PortfolioRiskConvolutionCalculator {
                                 break;
 
                             case RATE_EXCEEDANCE:
-                                // rate over full ERF duration (not annualized)
+                                // average rate over full ERF duration (not annualized)
                                 hazFunc = calc.getAnnualizedRates(hazFunc, 1.0);
                                 break;
 
