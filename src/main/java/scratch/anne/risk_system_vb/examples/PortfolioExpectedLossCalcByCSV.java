@@ -33,7 +33,7 @@ public class PortfolioExpectedLossCalcByCSV {
     	
 //    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
 //    	Path inputFolder = Path.of("p366\\PorterVulns");
-//    	Path inputFolder = Path.of("tests\\short_portfolio");
+////    	Path inputFolder = Path.of("tests\\short_portfolio");
     	
     	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\full_hcurve\\gem_vulns");
     	Path inputFolder = Path.of("hazus-taxonomy_vs30-365");
@@ -97,16 +97,19 @@ public class PortfolioExpectedLossCalcByCSV {
         }
 
         // ------------------- 4. Load portfolio -------------------
+        System.out.println("Loading portfolio...");
         Portfolio<VulnerabilityAsset> basePortfolio =
                 PortfolioReader.readCSV(portfolioCSV, VulnerabilityAsset.class);
 
         Set<String> portfolioVulns = basePortfolio.getResponseModelNames();
 
         // ------------------- 5. Load vulnerability library -------------------
+        System.out.println("Loading full vulnerability library...");
         ResponseModelLibrary<VulnerabilityModel> vulnLib =
                 VulnerabilityLibraryReader.readLibrary(vulnLibraryJSON);
 
         // ------------------- 6. Prepare Expected Vulnerability Library -------------------
+        System.out.println("Preparing vulnerability library...");
         ImValueTransformer transformer = Double.isNaN(logImStep)
                 ? new ImValueTransformer.NoImTransformation()
                 : new ImValueTransformer.LogInterpTransformation(logImStep);
@@ -114,9 +117,11 @@ public class PortfolioExpectedLossCalcByCSV {
                 SimpleImVulnLibraryPreparer.prepare(vulnLib, portfolioVulns, transformer);
 
         // ------------------- 7. Wrap portfolio with IMKey mapping -------------------
+        System.out.println("Preparing portfolio...");
         RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, expVulnLib);
 
         // ------------------- 8. Dynamic ERF -------------------
+        System.out.println("Loading ERF...");
         AbstractERF erf = (AbstractERF)
                 Class.forName(erfClassName)
                         .getDeclaredConstructor()
@@ -129,7 +134,7 @@ public class PortfolioExpectedLossCalcByCSV {
         AttenRelRef gmm =
                 AttenRelRef.valueOf(gmmName.toUpperCase());
 
-        // ------------------- 10. Create calculator -------------------       
+        // ------------------- 10. Create calculator -------------------  
         PortfolioRiskConvolutionCalculator calculator =
                 new PortfolioRiskConvolutionCalculator(
                         riskConvolutionPortfolio,
@@ -141,6 +146,7 @@ public class PortfolioExpectedLossCalcByCSV {
                 );
 
         // ------------------- 11. Compute Expected Loss -------------------
+        System.out.println("Running calculator...");
         riskConvolutionPortfolio = calculator.computeRisk();
         if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
             throw new IllegalStateException("Risk convolution did not complete correctly.");
