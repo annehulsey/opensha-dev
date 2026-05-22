@@ -6,6 +6,7 @@ import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class HazardCurveCollection {
 
@@ -29,7 +30,7 @@ public final class HazardCurveCollection {
 
     public HazardCurveCollection(HazardParameters parameters) {
         this.parameters = Objects.requireNonNull(parameters);
-        this.data = new LinkedHashMap<>();
+        this.data = new ConcurrentHashMap<>();
     }
 
     // ------------------------------------------------------------
@@ -41,8 +42,8 @@ public final class HazardCurveCollection {
             throw new IllegalStateException("HazardCurveCollection is frozen");
         }
 
-        data.computeIfAbsent(site, s -> new LinkedHashMap<>())
-            .put(im, hazard);
+        data.computeIfAbsent(site, s -> new ConcurrentHashMap<>())
+        .put(im, hazard);
     }
 
     // ------------------------------------------------------------

@@ -4,6 +4,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
 import org.opensha.commons.geo.Location;
 import org.opensha.commons.data.Site;
 import org.opensha.commons.param.Parameter;
@@ -265,17 +268,26 @@ public class PortfolioRiskConvolutionCalculator {
                         if (done % 100 == 0 || done == totalCurves) {
 
                             long now = System.nanoTime();
+
                             double elapsed = (now - startTime) / 1e9;
                             double rate = done / elapsed;
-                            double eta = (totalCurves - done) / rate;
+                            double etaSeconds = (totalCurves - done) / rate;
+
+                            LocalTime currentTime = LocalTime.now();
+                            LocalTime etaTime = currentTime.plusSeconds((long) etaSeconds);
+
+                            DateTimeFormatter fmt =
+                                    DateTimeFormatter.ofPattern("h:mm:ss a");
 
                             System.out.printf(
-                                    "Hazard %d / %d (%.1f%%) | %.1f curves/s | ETA %.1fs%n",
+                                    "Hazard %d / %d (%.1f%%) | %.1f curves/s | Now %s | ETA %s (%.1f hr remaining)%n",
                                     done,
                                     totalCurves,
                                     100.0 * done / totalCurves,
                                     rate,
-                                    eta
+                                    currentTime.format(fmt),
+                                    etaTime.format(fmt),
+                                    etaSeconds / 60.0 / 60.0
                             );
                         }
                     }
@@ -352,25 +364,34 @@ public class PortfolioRiskConvolutionCalculator {
                     asset.setRiskConvolutionResult(riskCalc.compute());
 
                 int done = counter.incrementAndGet();
-
+                
                 if (done % 100 == 0 || done == totalAssets) {
 
                     long now = System.nanoTime();
-                    double elapsed = (now - startTime) / 1e9;
 
+                    double elapsed = (now - startTime) / 1e9;
                     double rate = done / elapsed;
-                    double eta = (totalAssets - done) / rate;
+                    double etaSeconds = (totalAssets - done) / rate;
+
+                    LocalTime currentTime = LocalTime.now();
+                    LocalTime etaTime = currentTime.plusSeconds((long) etaSeconds);
+
+                    DateTimeFormatter fmt =
+                            DateTimeFormatter.ofPattern("h:mm:ss a");
 
                     System.out.printf(
-                            "Risk %d / %d (%.1f%%) | %.1f assets/s | ETA %.1fs%n",
+                            "Hazard %d / %d (%.1f%%) | %.1f assets/s | Now %s | ETA %s (%.1f hr remaining)%n",
                             done,
                             totalAssets,
                             100.0 * done / totalAssets,
                             rate,
-                            eta
+                            currentTime.format(fmt),
+                            etaTime.format(fmt),
+                            etaSeconds / 60.0 / 60.0
                     );
                 }
-                }
+
+              }
             }));
         });
 
