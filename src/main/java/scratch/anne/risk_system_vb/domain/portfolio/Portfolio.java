@@ -96,7 +96,7 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
         Map<T, SiteKey> tmp = new LinkedHashMap<>();
         for (Map.Entry<SiteKey, List<T>> e : siteMap.entrySet()) {
             SiteKey site = e.getKey();
-            for (T asset : assets) {
+            for (T asset : e.getValue()) {
                 tmp.put((T) asset, site);
             }
         }
