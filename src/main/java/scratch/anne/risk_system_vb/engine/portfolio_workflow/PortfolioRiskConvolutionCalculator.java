@@ -32,23 +32,13 @@ import scratch.anne.risk_system_vb.util.StringUtil.ImtPeriod;
 import scratch.anne.risk_system_vb.util.enums.IMT;
 
 /**
- * Two-stage portfolio-level workflow:
- *
- * <pre>
- * Stage 1: Hazard field computation
- *   (SiteKey × ImKey → HazardResult)
- *
- * Stage 2: Risk convolution
- *   (Asset + Hazard field → ConvolutionResult)
- * </pre>
- *
- * <h2>Design principles</h2>
+ * Portfolio workflow:
  * <ul>
- *   <li>Hazard is computed once and cached at portfolio level</li>
- *   <li>Risk is a deterministic transform over stored hazard</li>
  *   <li>Parallelization is performed at SiteKey level</li>
- *   <li>IM consistency is guaranteed via ImKey (not raw arrays)</li>
+ *   <li>Loop over all siteKeys and imKeys to minimize hazard calculations</li>
+ *   <li>InnerLoop over all relevant assets for risk calcs</li>
  * </ul>
+
  */
 public class PortfolioRiskConvolutionCalculator {
 
@@ -120,26 +110,11 @@ public class PortfolioRiskConvolutionCalculator {
                 RiskConvolution.IntegrationMethod.CLOSED_FORM);
     }
 
-    // ============================================================
-    // STAGE 1 — HAZARD FIELD COMPUTATION
-    // ============================================================
 
-    /**
-     * Computes and stores hazard curves for all (SiteKey, ImKey) pairs.
-     *
-     * <p>This method is parallelized over SiteKey. Each thread:
-     * <ul>
-     *   <li>constructs site-specific GMM state</li>
-     *   <li>loops over IM keys for that site</li>
-     *   <li>computes hazard curves</li>
-     *   <li>stores results in portfolio hazard cache</li>
-     * </ul>
-     *
-     * <p>After execution, hazardCurves becomes immutable input for risk stage.</p>
-     */
-    public void computeHazardCurves() {
+    /** hazard and risk calculation loops */
+    public RiskConvolutionPortfolio computeRisk() {
     	
-    	beginHazardComputation();
+    	initializeHazardStorage();
 
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
         ArrayDeque<HazardCurveCalculator> calcDeque = new ArrayDeque<>();
@@ -148,7 +123,7 @@ public class PortfolioRiskConvolutionCalculator {
 
         List<SiteKey> siteKeys = new ArrayList<>(portfolio.getSiteKeys());
 
-        int totalCurves = countTotalHazardCurves();
+        int totalHazardCurves = countTotalHazardCurves();
         AtomicInteger counter = new AtomicInteger();
 
         long startTime = System.nanoTime();
@@ -196,6 +171,10 @@ public class PortfolioRiskConvolutionCalculator {
                     }
 
                     gmm.setSite(site);
+                    
+                    //TODO integrate rupture filters more cleanly
+                    double distance = 200d;
+                    calc.setMaxSourceDistance( distance );
 
                     for (ImKey imKey : portfolio.getImKeysBySite(siteKey)) {
 
@@ -261,17 +240,29 @@ public class PortfolioRiskConvolutionCalculator {
                                 imKey,
                                 new HazardCurve(hazard)
                         );
+                        
+                        for (RiskConvolutionAsset asset :
+                            portfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
+
+	                        RiskConvolution riskCalc = new RiskConvolution(
+	                                responseLib.getByName(asset.getModelName()),
+	                                hazard,
+	                                integrationMethod
+	                        );
+	
+	                        asset.setRiskConvolutionResult(riskCalc.compute());
+                        }
 
                         // ----- PROGRESS -----
                         int done = counter.incrementAndGet();
 
-                        if (done % 100 == 0 || done == totalCurves) {
+                        if (done % 100 == 0 || done == totalHazardCurves) {
 
                             long now = System.nanoTime();
 
                             double elapsed = (now - startTime) / 1e9;
                             double rate = done / elapsed;
-                            double etaSeconds = (totalCurves - done) / rate;
+                            double etaSeconds = (totalHazardCurves - done) / rate;
 
                             LocalTime currentTime = LocalTime.now();
                             LocalTime etaTime = currentTime.plusSeconds((long) etaSeconds);
@@ -280,10 +271,10 @@ public class PortfolioRiskConvolutionCalculator {
                                     DateTimeFormatter.ofPattern("h:mm:ss a");
 
                             System.out.printf(
-                                    "Hazard %d / %d (%.1f%%) | %.1f curves/s | Now %s | ETA %s (%.1f hr remaining)%n",
+                                    "Hazard %d / %d (%.1f%%) | %.1f sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
                                     done,
-                                    totalCurves,
-                                    100.0 * done / totalCurves,
+                                    totalHazardCurves,
+                                    100.0 * done / totalHazardCurves,
                                     rate,
                                     currentTime.format(fmt),
                                     etaTime.format(fmt),
@@ -306,6 +297,31 @@ public class PortfolioRiskConvolutionCalculator {
         hazardComputed = true;
         
         portfolio.setHazardComputed(hazardComputed);
+        
+        riskComputed = true;
+        portfolio.setRiskConvolutionComputed(true);
+        
+        riskComputed = true;
+        portfolio.setRiskConvolutionComputed(true);
+        
+        
+        
+        double elapsedSeconds = (System.nanoTime() - startTime) / 1e9;
+
+        if (elapsedSeconds >= 3600) {
+            System.out.printf("Completed in %.1f hours%n",
+                    elapsedSeconds / 3600.0);
+        } else if (elapsedSeconds >= 60) {
+            System.out.printf("Completed in %.1f minutes%n",
+                    elapsedSeconds / 60.0);
+        } else {
+            System.out.printf("Completed in %.1f seconds%n",
+                    elapsedSeconds);
+        }
+        
+        
+        
+        return portfolio;
     }
     
     private int countTotalHazardCurves() {
@@ -319,90 +335,8 @@ public class PortfolioRiskConvolutionCalculator {
         return total;
     }
 
-    // ============================================================
-    // STAGE 2 — RISK CONVOLUTION
-    // ============================================================
 
-    /**
-     * Computes risk convolution using precomputed hazard field.
-     *
-     * <p>Requires {@link #computeHazardField()} to be executed first.</p>
-     *
-     * <p>Parallelized over SiteKey. Each site consumes cached hazard only.</p>
-     */
-    public void computeRiskConvolution() {
-
-        if (!hazardComputed) {
-            throw new IllegalStateException(
-                    "Hazard field must be computed before risk convolution.");
-        }
-
-        HazardCurveCollection hazards = portfolio.getHazardCurves();
-
-        int totalAssets = portfolio.getAssets().size();
-        AtomicInteger counter = new AtomicInteger();
-
-        long startTime = System.nanoTime();
-
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-
-        hazards.forEachCurve((siteKey, imKey, hazard) -> {
-
-            futures.add(CompletableFuture.runAsync(() -> {
-
-                double[] hazardY = hazard.getHazard();
-
-                for (RiskConvolutionAsset asset :
-                        portfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
-
-                    RiskConvolution riskCalc = new RiskConvolution(
-                            responseLib.getByName(asset.getModelName()),
-                            hazardY,
-                            integrationMethod
-                    );
-
-                    asset.setRiskConvolutionResult(riskCalc.compute());
-
-                int done = counter.incrementAndGet();
-                
-                if (done % 100 == 0 || done == totalAssets) {
-
-                    long now = System.nanoTime();
-
-                    double elapsed = (now - startTime) / 1e9;
-                    double rate = done / elapsed;
-                    double etaSeconds = (totalAssets - done) / rate;
-
-                    LocalTime currentTime = LocalTime.now();
-                    LocalTime etaTime = currentTime.plusSeconds((long) etaSeconds);
-
-                    DateTimeFormatter fmt =
-                            DateTimeFormatter.ofPattern("h:mm:ss a");
-
-                    System.out.printf(
-                            "Hazard %d / %d (%.1f%%) | %.1f assets/s | Now %s | ETA %s (%.1f hr remaining)%n",
-                            done,
-                            totalAssets,
-                            100.0 * done / totalAssets,
-                            rate,
-                            currentTime.format(fmt),
-                            etaTime.format(fmt),
-                            etaSeconds / 60.0 / 60.0
-                    );
-                }
-
-              }
-            }));
-        });
-
-        futures.forEach(CompletableFuture::join);
-
-        riskComputed = true;
-        portfolio.setRiskConvolutionComputed(true);
-    }
-
-
-    private void beginHazardComputation() {
+    private void initializeHazardStorage() {
 
         hazardComputed = false;
 
@@ -417,12 +351,4 @@ public class PortfolioRiskConvolutionCalculator {
         hazardCurves = new HazardCurveCollection(params);
     }
 
-    /**
-     * Convenience method for full pipeline execution.
-     */
-    public RiskConvolutionPortfolio computeRisk() {
-        computeHazardCurves();
-        computeRiskConvolution();
-        return portfolio;
-    }
 }
