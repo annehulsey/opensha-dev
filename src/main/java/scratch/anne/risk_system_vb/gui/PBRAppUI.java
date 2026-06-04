@@ -16,6 +16,8 @@ import org.opensha.sha.imr.AttenRelRef;
 import scratch.anne.risk_system_vb.util.enums.IMT;
 import scratch.anne.risk_system_vb.util.enums.LimitState;
 import scratch.anne.risk_system_vb.domain.hazard.AssetHazardCurve;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.domain.asset.fragility.PBRSurvivalAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
@@ -407,21 +409,37 @@ public class PBRAppUI extends JFrame {
 
                 RiskConvolutionPortfolio riskPortfolio =
                         new RiskConvolutionPortfolio(basePortfolio, fragilityLib);
+                
+                HazardParameters hazardParameters = new HazardParameters(
+                        erfClass,
+                        1.0,
+                        HazardMetric.PROBABILITY_EXCEEDANCE,
+                		gmm.name()
+                );
 
+                // CAN NO LONGER SHOW THE ERF STEP OUTSIDE OF THE CALCULATOR
+                //    but the .ASSESSING_RISK is [relatively] short so it just gets lumped with the BUILDING_ERF
                 setStage(Stage.BUILDING_ERF);
+//                
+//                AbstractERF erf = buildERF(erfClass);
+//                erf.getTimeSpan().setDuration(1.0);
+//                erf.updateForecast();
+//                
+//                setStage(Stage.ASSESSING_RISK);
+//
+//                PortfolioRiskConvolutionCalculator calculator =
+//                        new PortfolioRiskConvolutionCalculator(
+//                                riskPortfolio,
+//                                fragilityLib,
+//                                gmm,
+//                                erf
+//                        );
                 
-                AbstractERF erf = buildERF(erfClass);
-                erf.getTimeSpan().setDuration(1.0);
-                erf.updateForecast();
-                
-                setStage(Stage.ASSESSING_RISK);
-
                 PortfolioRiskConvolutionCalculator calculator =
                         new PortfolioRiskConvolutionCalculator(
                                 riskPortfolio,
                                 fragilityLib,
-                                gmm,
-                                erf
+                                hazardParameters
                         );
 
                 riskPortfolio = calculator.computeRisk();

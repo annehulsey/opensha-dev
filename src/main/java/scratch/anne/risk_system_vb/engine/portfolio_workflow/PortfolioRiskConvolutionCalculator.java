@@ -3,7 +3,7 @@ package scratch.anne.risk_system_vb.engine.portfolio_workflow;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-
+import java.lang.reflect.InvocationTargetException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -45,10 +45,11 @@ public class PortfolioRiskConvolutionCalculator {
 
     private final RiskConvolutionPortfolio portfolio;
     private final SimpleImResponseLibrary responseLib;
-    private final AttenRelRef gmmRef;
-    private final AbstractERF erf;
-    private final HazardMetric hazardMetric;
+    private final HazardParameters hazardParameters;
     private final RiskConvolution.IntegrationMethod integrationMethod;
+    
+    private final AbstractERF erf;
+    private final AttenRelRef gmmRef;
 
     HazardCurveCollection hazardCurves;
 
@@ -57,62 +58,50 @@ public class PortfolioRiskConvolutionCalculator {
     public PortfolioRiskConvolutionCalculator(
             RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
-            AttenRelRef gmmRef,
-            AbstractERF erf,
-            HazardMetric hazardMetric,
+            HazardParameters hazardParameters,
             RiskConvolution.IntegrationMethod integrationMethod
     ) {
         this.portfolio = portfolio;
         this.responseLib = responseLib;
-        this.gmmRef = gmmRef;
-        this.erf = erf;
-        this.hazardMetric = hazardMetric;
+        this.hazardParameters = hazardParameters;
         this.integrationMethod = integrationMethod;
+                
+        try {
+            erf = (AbstractERF)
+                    Class.forName(hazardParameters.getErfName())
+                            .getDeclaredConstructor()
+                            .newInstance();
+        } catch (ClassNotFoundException |
+                 NoSuchMethodException |
+                 IllegalAccessException |
+                 InstantiationException |
+                 InvocationTargetException e) {
+
+            throw new IllegalArgumentException(
+                    "Failed to instantiate ERF class: " + hazardParameters.getErfName(), e
+            );
+        }
+        
+      erf.getTimeSpan().setDuration(hazardParameters.getErfDuration());
+      erf.updateForecast();
+      
+      gmmRef = AttenRelRef.valueOf(hazardParameters.getGmmName().toUpperCase());
     }
 
     /** default integration method */
     public PortfolioRiskConvolutionCalculator(
             RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
-            AttenRelRef gmmRef,
-            AbstractERF erf,
-            HazardMetric hazardMetric
+            HazardParameters hazardParameters
     ) {
-        this(portfolio, responseLib, gmmRef, erf, 
-        		hazardMetric,
+        this(portfolio, responseLib, hazardParameters,
                 RiskConvolution.IntegrationMethod.CLOSED_FORM);
     }
-    
-    /** default hazard metric */
-    public PortfolioRiskConvolutionCalculator(
-            RiskConvolutionPortfolio portfolio,
-            SimpleImResponseLibrary responseLib,
-            AttenRelRef gmmRef,
-            AbstractERF erf,
-            RiskConvolution.IntegrationMethod integrationMethod
-    ) {
-        this(portfolio, responseLib, gmmRef, erf, 
-        		HazardMetric.PROBABILITY_EXCEEDANCE,
-                integrationMethod);
-    }    
-    
-    /** default hazard metric and integration method */
-    public PortfolioRiskConvolutionCalculator(
-            RiskConvolutionPortfolio portfolio,
-            SimpleImResponseLibrary responseLib,
-            AttenRelRef gmmRef,
-            AbstractERF erf
-    ) {
-        this(portfolio, responseLib, gmmRef, erf, 
-        		HazardMetric.PROBABILITY_EXCEEDANCE,
-                RiskConvolution.IntegrationMethod.CLOSED_FORM);
-    }
-
 
     /** hazard and risk calculation loops */
     public RiskConvolutionPortfolio computeRisk() {
     	
-    	initializeHazardStorage();
+    	hazardCurves = new HazardCurveCollection(hazardParameters);
 
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
         ArrayDeque<HazardCurveCalculator> calcDeque = new ArrayDeque<>();
@@ -212,7 +201,7 @@ public class PortfolioRiskConvolutionCalculator {
                         
                         hazFunc = calc.getHazardCurve(hazFunc, site, gmm, erf);
 
-                        switch (hazardMetric) {
+                        switch (hazardParameters.getHazardMetric()) {
 
                             case PROBABILITY_EXCEEDANCE:
                                 // already correct
@@ -225,7 +214,7 @@ public class PortfolioRiskConvolutionCalculator {
 
                             default:
                                 throw new IllegalArgumentException(
-                                    "Hazard metric not supported for risk convolution class: " + hazardMetric
+                                    "Hazard metric not supported for risk convolution class: " + hazardParameters.getHazardMetric()
                                 );
                         }
                         
@@ -323,20 +312,6 @@ public class PortfolioRiskConvolutionCalculator {
         }
 
         return total;
-    }
-
-
-    private void initializeHazardStorage() {
-
-        HazardParameters params =
-                new HazardParameters(
-                        erf.getName(),
-                        erf.getTimeSpan().getDuration(),
-                        hazardMetric,
-                        gmmRef.name()
-                );
-
-        hazardCurves = new HazardCurveCollection(params);
     }
 
 }

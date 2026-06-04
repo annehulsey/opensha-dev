@@ -1,5 +1,6 @@
 package scratch.anne.risk_system_vb.domain.hazard;
 
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetricType;
 import scratch.anne.risk_system_vb.io.writers.HazardCurvesExporter;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
@@ -14,7 +15,7 @@ public final class HazardCurveCollection {
     // METADATA (single source of truth)
     // ------------------------------------------------------------
 
-    private final HazardParameters parameters;
+    private final HazardParameters hazardParameters;
 
     // ------------------------------------------------------------
     // DATA
@@ -28,8 +29,16 @@ public final class HazardCurveCollection {
     // CONSTRUCTOR
     // ------------------------------------------------------------
 
-    public HazardCurveCollection(HazardParameters parameters) {
-        this.parameters = Objects.requireNonNull(parameters);
+    public HazardCurveCollection(HazardParameters hazardParameters) {
+        this.hazardParameters = Objects.requireNonNull(hazardParameters);
+
+        if (hazardParameters.getHazardMetricType() != HazardMetricType.EXCEEDANCE) {
+            throw new IllegalArgumentException(
+                "HazardCurveCollection requires EXCEEDANCE hazard metric type, but got: "
+                + hazardParameters.getHazardMetricType()
+            );
+        }
+
         this.data = new ConcurrentHashMap<>();
     }
 
@@ -69,7 +78,7 @@ public final class HazardCurveCollection {
     // ------------------------------------------------------------
 
     public HazardParameters getParameters() {
-        return parameters;
+        return hazardParameters;
     }
 
     public Map<SiteKey, Map<ImKey, HazardCurve>> asMap() {
