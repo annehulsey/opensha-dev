@@ -13,6 +13,7 @@ import org.opensha.commons.param.Parameter;
 import org.opensha.commons.data.function.DiscretizedFunc;
 import org.opensha.commons.data.function.ArbitrarilyDiscretizedFunc;
 import org.opensha.sha.calc.HazardCurveCalculator;
+import org.opensha.sha.calc.sourceFilters.SourceFilterManager;
 import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.imr.ScalarIMR;
@@ -22,7 +23,6 @@ import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
 import scratch.anne.risk_system_vb.domain.hazard.HazardCurve;
 import scratch.anne.risk_system_vb.domain.hazard.HazardCurveCollection;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
-import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
@@ -50,6 +50,8 @@ public class PortfolioRiskConvolutionCalculator {
     
     private final AbstractERF erf;
     private final AttenRelRef gmmRef;
+    
+    private final SourceFilterManager filterManager;
 
     HazardCurveCollection hazardCurves;
 
@@ -82,6 +84,8 @@ public class PortfolioRiskConvolutionCalculator {
             );
         }
         
+      filterManager = hazardParameters.buildSourceManager();  
+        
       erf.getTimeSpan().setDuration(hazardParameters.getErfDuration());
       erf.updateForecast();
       
@@ -110,7 +114,7 @@ public class PortfolioRiskConvolutionCalculator {
 
         List<SiteKey> siteKeys = new ArrayList<>(portfolio.getSiteKeys());
 
-        int totalHazardCurves = countTotalHazardCurves();
+        int totalHazardCurves = countTotalSiteImKeys();
         AtomicInteger counter = new AtomicInteger();
 
         long startTime = System.nanoTime();
@@ -152,16 +156,12 @@ public class PortfolioRiskConvolutionCalculator {
                     }
 
                     synchronized (calcDeque) {
-                        calc = calcDeque.isEmpty()
-                                ? new HazardCurveCalculator()
-                                : calcDeque.pop();
+                    	calc = calcDeque.isEmpty()
+                    		    ? new HazardCurveCalculator(filterManager)
+                    		    : calcDeque.pop();
                     }
 
                     gmm.setSite(site);
-                    
-                    //TODO integrate rupture filters more cleanly
-                    double distance = 200d;
-                    calc.setMaxSourceDistance( distance );
 
                     for (ImKey imKey : portfolio.getImKeysBySite(siteKey)) {
 
@@ -303,7 +303,7 @@ public class PortfolioRiskConvolutionCalculator {
         return portfolio;
     }
     
-    private int countTotalHazardCurves() {
+    private int countTotalSiteImKeys() {
 
         int total = 0;
 

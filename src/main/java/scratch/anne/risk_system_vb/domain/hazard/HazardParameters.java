@@ -1,8 +1,13 @@
 package scratch.anne.risk_system_vb.domain.hazard;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.opensha.sha.imr.AttenRelRef;
+import org.opensha.sha.calc.sourceFilters.SourceFilterManager;
+import org.opensha.sha.calc.sourceFilters.SourceFilters;
+import org.opensha.sha.calc.sourceFilters.params.SourceFiltersParam;
 
 /**
  * Immutable metadata describing how a hazard field was generated.
@@ -33,21 +38,38 @@ public final class HazardParameters {
 
     private final String erfName;
     private final double erfDuration;
-
     private final HazardMetric hazardMetric;
-
     private final String gmmName;
+    
+    private final Map<String, String> filterConfig;
 
+    // Convenience constructor
     public HazardParameters(
             String erfName,
             double erfDuration,
             HazardMetric hazardMetric,
             String gmmName
     ) {
+    	this(erfName, erfDuration, hazardMetric, gmmName, null);
+    }
+    
+    
+    public HazardParameters(
+            String erfName,
+            double erfDuration,
+            HazardMetric hazardMetric,
+            String gmmName,
+            Map<String,String> filterConfig
+    ) {
         this.erfName = Objects.requireNonNull(erfName);
         this.erfDuration = erfDuration;
         this.hazardMetric = Objects.requireNonNull(hazardMetric);
         this.gmmName = Objects.requireNonNull(gmmName);
+        
+        this.filterConfig =
+                filterConfig == null
+                ? Map.of()
+                : Map.copyOf(filterConfig);
         
         // -------------------------------
         // Validate ERF class exists
@@ -95,6 +117,7 @@ public final class HazardParameters {
         return gmmName;
     }
 
+
     @Override
     public String toString() {
         return "HazardParameters{" +
@@ -103,5 +126,16 @@ public final class HazardParameters {
                 ", hazard metric=" + hazardMetric +
                 ", gmm='" + gmmName + '\'' +
                 '}';
+    }
+
+    public Map<String,String> getFilterConfig() {
+        return filterConfig;
+    }
+    
+    public SourceFilterManager buildSourceManager() {
+
+        return new BuildSourceFilterManager()
+                .fromConfig(filterConfig)
+                .build();
     }
 }

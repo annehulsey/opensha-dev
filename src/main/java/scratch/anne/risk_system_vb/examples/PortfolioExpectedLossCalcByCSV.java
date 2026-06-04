@@ -2,14 +2,9 @@ package scratch.anne.risk_system_vb.examples;
 
 import java.nio.file.*;
 import java.util.*;
-import java.io.*;
-
-import org.opensha.sha.earthquake.AbstractERF;
-import org.opensha.sha.imr.AttenRelRef;
 
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.VulnerabilityAsset;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
-import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.ExpectedLossPortfolioAggregator;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
@@ -19,6 +14,7 @@ import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.Si
 import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.VulnerabilityModel;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
+import scratch.anne.risk_system_vb.io.readers.ParseRiskRunParametersCSV;
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
@@ -35,7 +31,7 @@ public class PortfolioExpectedLossCalcByCSV {
     	
     	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
 //    	Path inputFolder = Path.of("p366\\PorterVulns");
-    	Path inputFolder = Path.of("tests\\short_portfolio");
+    	Path inputFolder = Path.of("tests\\short_portfolio_maxDist-20");
     	
 //    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\full_hcurve\\gem_vulns");
 //    	Path inputFolder = Path.of("hazus-taxonomy_vs30-365");
@@ -52,20 +48,23 @@ public class PortfolioExpectedLossCalcByCSV {
         if (!Files.exists(configCSV))
             throw new IllegalArgumentException("Missing input.csv in run folder: " + runFolder);
 
-        Map<String, String> config = loadConfig(configCSV);
-
         System.out.println("Running portfolio from folder:");
         System.out.println(runFolder);
+        
+        Map<String, String> config =
+                ParseRiskRunParametersCSV.loadConfig(configCSV);
 
-        // ------------------- 2. Resolve input files (can be shared) -------------------
+        Map<String, String> filterConfig =
+                ParseRiskRunParametersCSV.extractSourceFilterConfig(config);
+
+        // ------------------- 1. Resolve input files -------------------
         Path portfolioCSV = Path.of(config.get("portfolio_csv"));
         Path vulnLibraryJSON = Path.of(config.get("vuln_library_json"));
 
-        // ----------- VERIFY INPUT FILES EXIST -----------
         IO.verifyFileExists(portfolioCSV, "Portfolio CSV");
         IO.verifyFileExists(vulnLibraryJSON, "Vulnerability JSON");
 
-        // ------------------- 3. Output paths inside run folder -------------------
+        // ------------------- 2. create output paths inside run folder -------------------
         String fileTag = config.getOrDefault("file_tag", runFolder.getFileName().toString());
         Path outputCSV = runFolder.resolve(fileTag + ".csv");
         Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated.csv");
@@ -74,15 +73,19 @@ public class PortfolioExpectedLossCalcByCSV {
                 : null;
 
         
-     // ----------- PREPARE HAZARD AND INTEGRATION PARAMETERS -----------
+        // ------------------- 3. prepare hazard and integration parameters ----------------
         HazardParameters hazardParameters = new HazardParameters(
                 config.get("erf_class"),
-                StringUtil.parseDoubleOrDefault(config.get("erf_duration"), 1.0),
-                parseHazardMetric(config.get("hazard_metric")),
-                config.get("gmm")
+                StringUtil.parseDoubleOrDefault(
+                        config.get("erf_duration"),
+                        1.0
+                ),
+                ParseRiskRunParametersCSV.parseHazardMetric(config.get("hazard_metric")),
+                config.get("gmm"),
+                filterConfig
         );
         
-        RiskConvolution.IntegrationMethod integrationMethod = parseIntegrationMethod(config.get("integration_method"));
+        RiskConvolution.IntegrationMethod integrationMethod = ParseRiskRunParametersCSV.parseIntegrationMethod(config.get("integration_method"));
         double logImStep = StringUtil.parseDoubleOrDefault(config.get("log_im_step"), Double.NaN);
         
 
@@ -110,7 +113,7 @@ public class PortfolioExpectedLossCalcByCSV {
         System.out.println("Preparing portfolio...");
         RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, expVulnLib);
 
-        // ------------------- 10. Create calculator -------------------  
+        // ------------------- 8. Create calculator -------------------  
         PortfolioRiskConvolutionCalculator calculator =
                 new PortfolioRiskConvolutionCalculator(
                         riskConvolutionPortfolio,
@@ -119,7 +122,7 @@ public class PortfolioExpectedLossCalcByCSV {
                         integrationMethod
                 );
 
-        // ------------------- 11. Compute Expected Loss -------------------
+        // ------------------- 9. Compute Expected Loss -------------------
         System.out.println("Running calculator...");
         riskConvolutionPortfolio = calculator.computeRisk();
         riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.FULL_HCURVE);
@@ -128,7 +131,7 @@ public class PortfolioExpectedLossCalcByCSV {
         ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
         aggregator.printSummary();
 
-        // ------------------- 12. Write outputs to run folder -------------------
+        // ------------------- 10. Write outputs to run folder -------------------
         aggregator.writeCSV(outputCSV);
         aggregator.writeAggregatedCSV(aggregatedOutputCSV);
 
@@ -138,62 +141,5 @@ public class PortfolioExpectedLossCalcByCSV {
         System.out.println(hazardJson);
         
     }
-
-    // ------------------- Helper: Load CSV config -------------------
-    private static Map<String, String> loadConfig(Path csvPath) throws IOException {
-        Map<String, String> map = new HashMap<>();
-        try (BufferedReader br = Files.newBufferedReader(csvPath)) {
-            br.readLine(); // skip header
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] tokens = line.split(",", 2);
-                if (tokens.length == 2) {
-                    map.put(tokens[0].trim(), tokens[1].trim());
-                }
-            }
-        }
-        return map;
-    }
-    
-    public static HazardMetric parseHazardMetric(String s) {
-
-        if (s == null || s.isBlank())
-            return HazardMetric.PROBABILITY_EXCEEDANCE;
-
-        String key = s.trim().toUpperCase();
-
-        switch (key) {
-
-            // ---- probability aliases ----
-            case "PROB":
-            case "PROBABILITY":
-            case "PROBABILITY_EXCEEDANCE":
-                return HazardMetric.PROBABILITY_EXCEEDANCE;
-
-            // ---- rate aliases ----
-            case "RATE":
-            case "RATE_EXCEEDANCE":
-                return HazardMetric.RATE_EXCEEDANCE;
-
-            default:
-                // still allow exact enum names
-                try {
-                    return HazardMetric.valueOf(key);
-                } catch (IllegalArgumentException e) {
-                    throw new IllegalArgumentException(
-                        "Unknown hazard metric: " + s 
-                    );
-                }
-        }
-    }
-    
-    public static RiskConvolution.IntegrationMethod parseIntegrationMethod(String s) {
-        if (s == null || s.isBlank()) {
-            return RiskConvolution.IntegrationMethod.CLOSED_FORM;
-        }
-
-        return RiskConvolution.IntegrationMethod.valueOf(s.trim().toUpperCase());
-    }
-
 
 }
