@@ -3,10 +3,9 @@ package scratch.anne.risk_system_vb.examples.PBR;
 import java.nio.file.*;
 import java.util.*;
 
-import org.opensha.sha.earthquake.AbstractERF;
-import org.opensha.sha.imr.AttenRelRef;
-
 import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.PBRSurvivalPortfolioReporter;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
@@ -22,6 +21,7 @@ import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.FragilityLibraryReader;
 import scratch.anne.risk_system_vb.io.InputConfigUtil;
 import scratch.anne.risk_system_vb.util.IO;
+import scratch.anne.risk_system_vb.util.StringUtil;
 
 public class LJBPortfolioPFail {
 
@@ -61,10 +61,6 @@ public class LJBPortfolioPFail {
         Path hazardJson = writeHazard
                 ? runFolder.resolve(fileTag + "_hazard-list.json")
                 : null;
-
-        String erfClassName = config.get("erf_class");
-        String gmmName = config.get("gmm");
-        String integrationMethod = config.getOrDefault("integration_method", "CLOSED_FORM");
         
         List<Double> probabilityTargets =
                 InputConfigUtil.parseDoubleList(config.get("probability_targets"));
@@ -74,21 +70,16 @@ public class LJBPortfolioPFail {
         }
         
         
-        // ------------ VERIFY ERF and GMM EXIST -------------------
-        try {
-            Class<?> erfClass = Class.forName(erfClassName);
-            if (!AbstractERF.class.isAssignableFrom(erfClass)) {
-                throw new IllegalArgumentException("Specified ERF class does not extend AbstractERF: " + erfClassName);
-            }
-        } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException("ERF class not found: " + erfClassName, e);
-        }
+        // ----------- PREPARE HAZARD AND INTEGRATION PARAMETERS -----------
+        HazardParameters hazardParameters = new HazardParameters(
+                config.get("erf_class"),
+                StringUtil.parseDoubleOrDefault(config.get("erf_duration"), 1.0),
+                parseHazardMetric(config.get("hazard_metric")),
+                config.get("gmm")
+        );
         
-        try {
-            AttenRelRef.valueOf(gmmName.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("GMM not recognized: " + gmmName, e);
-        }
+        RiskConvolution.IntegrationMethod integrationMethod = parseIntegrationMethod(config.get("integration_method"));
+        double logImStep = StringUtil.parseDoubleOrDefault(config.get("log_im_step"), Double.NaN);
 
         // ------------------- 4. Load portfolio -------------------
         Portfolio<FragilityAsset> basePortfolio =
@@ -108,32 +99,13 @@ public class LJBPortfolioPFail {
         // ------------------- 7. Wrap portfolio with IMKey mapping -------------------
         RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, fragilityLib);
 
-        // ------------------- 8. Dynamic ERF -------------------
-        AbstractERF erf = (AbstractERF)
-                Class.forName(erfClassName)
-                        .getDeclaredConstructor()
-                        .newInstance();
-
-        erf.getTimeSpan().setDuration(1.0);
-        erf.updateForecast();
-
-        // ------------------- 9. Dynamic attenuation relation -------------------
-        AttenRelRef gmm =
-                AttenRelRef.valueOf(gmmName.toUpperCase());
-
-        // ------------------- 10. Create calculator -------------------
-        RiskConvolution.IntegrationMethod integrationMethodEnum =
-                "RIEMANN".equalsIgnoreCase(integrationMethod)
-                        ? RiskConvolution.IntegrationMethod.RIEMANN
-                        : RiskConvolution.IntegrationMethod.CLOSED_FORM;
-        
+        // ------------------- 10. Create calculator -------------------       
         PortfolioRiskConvolutionCalculator calculator =
                 new PortfolioRiskConvolutionCalculator(
                         riskConvolutionPortfolio,
                         fragilityLib,
-                        gmm,
-                        erf,
-                        integrationMethodEnum
+                        hazardParameters,
+                        integrationMethod
                 );
 
         // ------------------- 11. Compute Probability of Failure -------------------
@@ -150,6 +122,46 @@ public class LJBPortfolioPFail {
         System.out.println(outputCSV);
         System.out.println(hazardJson);
         
+    }
+    
+    public static HazardMetric parseHazardMetric(String s) {
+
+        if (s == null || s.isBlank())
+            return HazardMetric.PROBABILITY_EXCEEDANCE;
+
+        String key = s.trim().toUpperCase();
+
+        switch (key) {
+
+            // ---- probability aliases ----
+            case "PROB":
+            case "PROBABILITY":
+            case "PROBABILITY_EXCEEDANCE":
+                return HazardMetric.PROBABILITY_EXCEEDANCE;
+
+            // ---- rate aliases ----
+            case "RATE":
+            case "RATE_EXCEEDANCE":
+                return HazardMetric.RATE_EXCEEDANCE;
+
+            default:
+                // still allow exact enum names
+                try {
+                    return HazardMetric.valueOf(key);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                        "Unknown hazard metric: " + s 
+                    );
+                }
+        }
+    }
+    
+    public static RiskConvolution.IntegrationMethod parseIntegrationMethod(String s) {
+        if (s == null || s.isBlank()) {
+            return RiskConvolution.IntegrationMethod.CLOSED_FORM;
+        }
+
+        return RiskConvolution.IntegrationMethod.valueOf(s.trim().toUpperCase());
     }
 
 }

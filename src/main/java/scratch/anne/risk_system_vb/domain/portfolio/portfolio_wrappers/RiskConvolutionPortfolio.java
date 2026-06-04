@@ -67,7 +67,7 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
     private ConvolutionMode convolutionMode = ConvolutionMode.UNCOMPUTED;
     
 	 // ---------------------------------------------------------------------
-	 // Hazard curves (computed state for ConvolutionMode.FULL_HCURVE)
+	 // Hazard curves (used when ConvolutionMode.FULL_HCURVE)
 	 // ---------------------------------------------------------------------
 	
     private HazardCurveCollection hazardCurves;

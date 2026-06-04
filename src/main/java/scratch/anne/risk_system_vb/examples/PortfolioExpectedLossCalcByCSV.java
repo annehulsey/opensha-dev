@@ -8,6 +8,7 @@ import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.imr.AttenRelRef;
 
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.VulnerabilityAsset;
+import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.ExpectedLossPortfolioAggregator;
@@ -72,30 +73,18 @@ public class PortfolioExpectedLossCalcByCSV {
                 ? runFolder.resolve(fileTag + "_hazard-list.json")
                 : null;
 
-        String erfClassName = config.get("erf_class");
-        String gmmName = config.get("gmm");
         
-        HazardMetric hazardMetric = parseHazardMetric(config.get("hazard_metric"));
-        double erfDuration = StringUtil.parseDoubleOrDefault(config.get("erf_duration"), 1.0);
+     // ----------- PREPARE HAZARD AND INTEGRATION PARAMETERS -----------
+        HazardParameters hazardParameters = new HazardParameters(
+                config.get("erf_class"),
+                StringUtil.parseDoubleOrDefault(config.get("erf_duration"), 1.0),
+                parseHazardMetric(config.get("hazard_metric")),
+                config.get("gmm")
+        );
         
         RiskConvolution.IntegrationMethod integrationMethod = parseIntegrationMethod(config.get("integration_method"));
         double logImStep = StringUtil.parseDoubleOrDefault(config.get("log_im_step"), Double.NaN);
         
-        // ------------ VERIFY ERF and GMM EXIST -------------------
-        try {
-            Class<?> erfClass = Class.forName(erfClassName);
-            if (!AbstractERF.class.isAssignableFrom(erfClass)) {
-                throw new IllegalArgumentException("Specified ERF class does not extend AbstractERF: " + erfClassName);
-            }
-        } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException("ERF class not found: " + erfClassName, e);
-        }
-        
-        try {
-            AttenRelRef.valueOf(gmmName.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("GMM not recognized: " + gmmName, e);
-        }
 
         // ------------------- 4. Load portfolio -------------------
         System.out.println("Loading portfolio...");
@@ -121,28 +110,12 @@ public class PortfolioExpectedLossCalcByCSV {
         System.out.println("Preparing portfolio...");
         RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, expVulnLib);
 
-        // ------------------- 8. Dynamic ERF -------------------
-        System.out.println("Loading ERF...");
-        AbstractERF erf = (AbstractERF)
-                Class.forName(erfClassName)
-                        .getDeclaredConstructor()
-                        .newInstance();
-
-        erf.getTimeSpan().setDuration(erfDuration);
-        erf.updateForecast();
-
-        // ------------------- 9. Dynamic attenuation relation -------------------
-        AttenRelRef gmm =
-                AttenRelRef.valueOf(gmmName.toUpperCase());
-
         // ------------------- 10. Create calculator -------------------  
         PortfolioRiskConvolutionCalculator calculator =
                 new PortfolioRiskConvolutionCalculator(
                         riskConvolutionPortfolio,
                         expVulnLib,
-                        gmm,
-                        erf,
-                        hazardMetric,
+                        hazardParameters,
                         integrationMethod
                 );
 
