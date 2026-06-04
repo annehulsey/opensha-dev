@@ -10,6 +10,7 @@ import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.PBRSurvivalPortfolioReporter;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.structural_response.ResponseModelLibrary;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.domain.structural_response.fragilities.FragilityModel;
@@ -137,9 +138,7 @@ public class LJBPortfolioPFail {
 
         // ------------------- 11. Compute Probability of Failure -------------------
         riskConvolutionPortfolio = calculator.computeRisk();
-        if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
-            throw new IllegalStateException("Risk convolution did not complete correctly.");
-        }
+        riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.FULL_HCURVE);
         riskConvolutionPortfolio.exportHazard(hazardJson);
         
 	    // ------------------- 12. Write PBR outputs to run folder -------------------

@@ -4,6 +4,7 @@ import scratch.anne.risk_system_vb.domain.asset.fragility.*;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.util.Metadata;
 
 import java.io.IOException;
@@ -42,10 +43,7 @@ public final class PBRSurvivalPortfolioReporter
 
         this.base = Objects.requireNonNull(base);
 
-        if (!base.isRiskConvolutionComputed()) {
-            throw new IllegalStateException(
-                    "RiskConvolutionPortfolio must be computed first.");
-        }
+        base.assertConvolutionExecutedAs(ConvolutionMode.FULL_HCURVE);
 
         this.probabilityTargets = List.copyOf(probabilityTargets);
 

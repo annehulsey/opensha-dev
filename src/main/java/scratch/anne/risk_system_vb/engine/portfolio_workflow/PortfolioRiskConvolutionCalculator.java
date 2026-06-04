@@ -24,6 +24,7 @@ import scratch.anne.risk_system_vb.domain.hazard.HazardCurveCollection;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
@@ -49,11 +50,8 @@ public class PortfolioRiskConvolutionCalculator {
     private final HazardMetric hazardMetric;
     private final RiskConvolution.IntegrationMethod integrationMethod;
 
-    /** true once hazard field is fully computed */
-    private boolean hazardComputed = false;
     HazardCurveCollection hazardCurves;
-    
-    private boolean riskComputed = false;
+
 
     /** full constructor */
     public PortfolioRiskConvolutionCalculator(
@@ -294,17 +292,9 @@ public class PortfolioRiskConvolutionCalculator {
 
         hazardCurves.freeze();
         portfolio.setHazardCurves(hazardCurves);
-        hazardComputed = true;
         
-        portfolio.setHazardComputed(hazardComputed);
-        
-        riskComputed = true;
-        portfolio.setRiskConvolutionComputed(true);
-        
-        riskComputed = true;
-        portfolio.setRiskConvolutionComputed(true);
-        
-        
+        portfolio.setConvolutionMode(ConvolutionMode.FULL_HCURVE);
+       
         
         double elapsedSeconds = (System.nanoTime() - startTime) / 1e9;
 
@@ -337,8 +327,6 @@ public class PortfolioRiskConvolutionCalculator {
 
 
     private void initializeHazardStorage() {
-
-        hazardComputed = false;
 
         HazardParameters params =
                 new HazardParameters(

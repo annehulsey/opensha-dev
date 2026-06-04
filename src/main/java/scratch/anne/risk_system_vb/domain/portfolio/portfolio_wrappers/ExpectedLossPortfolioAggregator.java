@@ -2,6 +2,7 @@ package scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers;
 
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.asset.fragility.PBRSurvivalAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
@@ -43,12 +44,7 @@ public final class ExpectedLossPortfolioAggregator
 
         this.base = Objects.requireNonNull(base);
         
-        if (!base.isRiskConvolutionComputed()) {
-            throw new IllegalStateException(
-                    "RiskConvolutionPortfolio has not been computed. " +
-                    "Cannot build ExpectedLossPortfolioAggregator."
-            );
-        }
+        base.assertConvolutionExecutedAs(ConvolutionMode.FULL_HCURVE);
         
         this.assets = List.copyOf(
                 base.getAssets().stream()
