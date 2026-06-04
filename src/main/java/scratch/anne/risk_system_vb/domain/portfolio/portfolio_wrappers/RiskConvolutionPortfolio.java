@@ -63,12 +63,11 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
     private final List<String> additionalFieldNames;
 
     private final Metadata metadata;
-
-    private boolean hazardComputed;
-    private boolean riskConvolutionComputed;
+    
+    private ConvolutionMode convolutionMode = ConvolutionMode.UNCOMPUTED;
     
 	 // ---------------------------------------------------------------------
-	 // Hazard curves (computed state)
+	 // Hazard curves (computed state for ConvolutionMode.FULL_HCURVE)
 	 // ---------------------------------------------------------------------
 	
     private HazardCurveCollection hazardCurves;
@@ -84,8 +83,6 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
         Objects.requireNonNull(base);
         Objects.requireNonNull(responseLibrary);
 
-        this.hazardComputed = false;
-        this.riskConvolutionComputed = false;
 
         // Build IM lookup: modelName → IMKey
         Map<String, ImKey> responseToIm = new HashMap<>();
@@ -241,25 +238,6 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
         );
     }
 
-    // ---------------------------------------------------------------------
-    // State
-    // ---------------------------------------------------------------------
-
-    public boolean isRiskConvolutionComputed() {
-        return riskConvolutionComputed;
-    }
-
-    public void setRiskConvolutionComputed(boolean computed) {
-        this.riskConvolutionComputed = computed;
-    }
-    
-    public boolean isHazardComputed() {
-        return hazardComputed;
-    }
-
-    public void setHazardComputed(boolean computed) {
-        this.hazardComputed = computed;
-    }
 
     // ---------------------------------------------------------------------
     // PortfolioGetters
@@ -367,6 +345,29 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
         return assets.stream()
                 .map(RiskConvolutionAsset::getModelName)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+    
+    
+    // ----- Convolution mode for portfolio state ------
+    public enum ConvolutionMode {
+	    UNCOMPUTED,
+	    FULL_HCURVE,
+	    RUPTURE_BY_RUPTURE
+	}
+    
+    public void setConvolutionMode(ConvolutionMode convolutionMode) {
+        if (this.convolutionMode != ConvolutionMode.UNCOMPUTED && this.convolutionMode != convolutionMode) {
+            throw new IllegalStateException("Portfolio already used in a different convolution mode");
+        }
+        this.convolutionMode = convolutionMode;
+    }
+    
+    public void assertConvolutionExecutedAs(ConvolutionMode expected) {
+        if (this.convolutionMode != expected) {
+            throw new IllegalStateException(
+                "Expected risk convolution mode " + expected + " but was " + convolutionMode
+            );
+        }
     }
     
     // ----- hazard storage helpers ---------   

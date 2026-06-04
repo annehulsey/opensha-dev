@@ -4,13 +4,6 @@ import java.util.Objects;
 
 /**
  * Immutable metadata describing how a hazard field was generated.
- *
- * <p>This is intentionally separate from the hazard values themselves so that:
- * <ul>
- *   <li>metadata is not duplicated per Site/IM</li>
- *   <li>hazard values remain pure numeric results</li>
- *   <li>risk can reuse hazard under identical assumptions</li>
- * </ul>
  */
 public final class HazardParameters {
 

@@ -22,6 +22,7 @@ import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 import scratch.anne.risk_system_vb.util.StringUtil;
+import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.util.IO;
 
 /**
@@ -31,12 +32,12 @@ public class PortfolioExpectedLossCalcByCSV {
 
     public static void main(String[] args) throws Exception {
     	
-//    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
+    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
 //    	Path inputFolder = Path.of("p366\\PorterVulns");
-////    	Path inputFolder = Path.of("tests\\short_portfolio");
+    	Path inputFolder = Path.of("tests\\short_portfolio");
     	
-    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\full_hcurve\\gem_vulns");
-    	Path inputFolder = Path.of("hazus-taxonomy_vs30-365");
+//    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\full_hcurve\\gem_vulns");
+//    	Path inputFolder = Path.of("hazus-taxonomy_vs30-365");
     	
     	boolean writeHazard = true;
 
@@ -148,9 +149,7 @@ public class PortfolioExpectedLossCalcByCSV {
         // ------------------- 11. Compute Expected Loss -------------------
         System.out.println("Running calculator...");
         riskConvolutionPortfolio = calculator.computeRisk();
-        if (!riskConvolutionPortfolio.isRiskConvolutionComputed()) {
-            throw new IllegalStateException("Risk convolution did not complete correctly.");
-        }
+        riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.FULL_HCURVE);
         riskConvolutionPortfolio.exportHazard(hazardJson);
         
         ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
