@@ -17,7 +17,9 @@ public class PBRSurvivalAsset extends RiskConvolutionAsset {
             base.getLongitude(),
             base.getVs30(),
             base.getModelName(),
-            base.getAdditionalFields()
+            base.getAdditionalFields(),
+            AssetType.FRAGILITY,
+            RiskMetricType.PBR_SURVIVAL
         );
 
         this.base = base;

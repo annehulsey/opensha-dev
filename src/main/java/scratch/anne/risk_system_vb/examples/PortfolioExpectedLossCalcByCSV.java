@@ -31,7 +31,7 @@ public class PortfolioExpectedLossCalcByCSV {
     	
     	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
 //    	Path inputFolder = Path.of("p366\\PorterVulns");
-    	Path inputFolder = Path.of("tests\\short_portfolio_maxDist-20");
+    	Path inputFolder = Path.of("tests\\short_portfolio_25yr_riemann");
     	
 //    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\full_hcurve\\gem_vulns");
 //    	Path inputFolder = Path.of("hazus-taxonomy_vs30-365");

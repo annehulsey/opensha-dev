@@ -19,7 +19,9 @@ public class FailureProbabilityAsset extends RiskConvolutionAsset{
             asset.getLongitude(),
             asset.getVs30(),
             asset.getModelName(),
-            asset.getAdditionalFields()
+            asset.getAdditionalFields(),
+            AssetType.FRAGILITY,
+            RiskMetricType.FAILURE_PROBABILITY
         );
 
         this.asset = asset;
@@ -27,6 +29,10 @@ public class FailureProbabilityAsset extends RiskConvolutionAsset{
 
     public FragilityAsset getAsset() {
         return asset;
+    }
+    
+    public RiskMetricType getRiskMetricType() {
+    	return RiskMetricType.FAILURE_PROBABILITY;
     }
 
     public double getProbabilityOfFailure() {

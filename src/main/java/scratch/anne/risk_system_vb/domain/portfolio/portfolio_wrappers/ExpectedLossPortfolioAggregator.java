@@ -3,6 +3,8 @@ package scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
+import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
+import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricType;
 import scratch.anne.risk_system_vb.domain.asset.fragility.PBRSurvivalAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
@@ -71,6 +73,17 @@ public final class ExpectedLossPortfolioAggregator
     @Override
     public ExpectedLossAsset getAssetByID(String assetID) {
         return (ExpectedLossAsset) base.getAssetByID(assetID);
+    }
+    
+    @Override
+    public AssetType getAssetType() {
+    	// risk convolution portofolio already confirm homogeneity
+    	return assets.get(0).getAssetType();
+    }
+    
+    public RiskMetricType getRiskMetricType() {
+    	// risk convolution portofolio already confirm homogeneity
+    	return assets.get(0).getRiskMetricType();
     }
 
     @Override
@@ -294,7 +307,28 @@ public final class ExpectedLossPortfolioAggregator
                     "GroupField,GroupValue,NumAssets,TotalValue,TotalExpectedLoss," +
                     "Avg,Min,Max,StdDev"
             );
+            
+            // ----- Portfolio-wide summary -----
+            Map<String, Double> allStats = summarize(getAssets());
 
+            double totalValue = getAssets().stream()
+                    .mapToDouble(ExpectedLossAsset::getValue)
+                    .sum();
+
+            pw.printf(
+                    "\"%s\",\"%s\",%d,%.6f,%.6e,%.6f,%.6f,%.6f,%.6f%n",
+                    "ALL",
+                    "ALL",
+                    allStats.get("n").intValue(),
+                    totalValue,
+                    allStats.get("total"),
+                    allStats.get("avg"),
+                    allStats.get("min"),
+                    allStats.get("max"),
+                    allStats.get("stdDev")
+            );
+
+         // ----- Group summaries -----
             for (String field : getAdditionalFieldNames()) {
 
                 for (Map.Entry<String, List<ExpectedLossAsset>> e :
@@ -305,7 +339,7 @@ public final class ExpectedLossPortfolioAggregator
                     Map<String, Double> stats =
                             summarize(group);
 
-                    double totalValue = group.stream()
+                    totalValue = group.stream()
                             .mapToDouble(ExpectedLossAsset::getValue)
                             .sum();
 

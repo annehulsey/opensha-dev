@@ -1,6 +1,7 @@
 package scratch.anne.risk_system_vb.domain.portfolio;
 
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset;
+import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
 import scratch.anne.risk_system_vb.util.Metadata;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import java.util.List;
@@ -21,6 +22,8 @@ public interface PortfolioGetters<T extends AbstractAsset> {
 
     /** Lookup single asset by ID. */
     T getAssetByID(String assetID);
+    
+    AssetType getAssetType();
 
     int size();
 

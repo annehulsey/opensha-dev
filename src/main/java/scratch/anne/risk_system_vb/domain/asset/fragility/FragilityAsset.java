@@ -3,6 +3,7 @@ package scratch.anne.risk_system_vb.domain.asset.fragility;
 import java.util.*;
 
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset;
+import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
 
 /**
  * Asset pointing to a fragility for the response model.
@@ -21,7 +22,7 @@ public class FragilityAsset extends AbstractAsset {
      */
     public FragilityAsset(String assetID, double lat, double lon, double vs30,
                               String responseModel, Map<String, String> extraFields) {
-        super(assetID, lat, lon, vs30, responseModel, extraFields);
+        super(assetID, lat, lon, vs30, responseModel, extraFields, AssetType.FRAGILITY);
     }
    
     

@@ -69,7 +69,7 @@ public class PortfolioRiskConvolutionCalculator {
         this.integrationMethod = integrationMethod;
                 
         try {
-            erf = (AbstractERF)
+            this.erf = (AbstractERF)
                     Class.forName(hazardParameters.getErfName())
                             .getDeclaredConstructor()
                             .newInstance();
@@ -84,12 +84,12 @@ public class PortfolioRiskConvolutionCalculator {
             );
         }
         
-      filterManager = hazardParameters.buildSourceManager();  
+        this.filterManager = hazardParameters.buildSourceManager();  
         
-      erf.getTimeSpan().setDuration(hazardParameters.getErfDuration());
-      erf.updateForecast();
+        this.erf.getTimeSpan().setDuration(hazardParameters.getErfDuration());
+        this.erf.updateForecast();
       
-      gmmRef = AttenRelRef.valueOf(hazardParameters.getGmmName().toUpperCase());
+        this.gmmRef = AttenRelRef.valueOf(hazardParameters.getGmmName().toUpperCase());
     }
 
     /** default integration method */
@@ -157,6 +157,7 @@ public class PortfolioRiskConvolutionCalculator {
 
                     synchronized (calcDeque) {
                     	calc = calcDeque.isEmpty()
+                    			// filter erf when doing the hazard calculation
                     		    ? new HazardCurveCalculator(filterManager)
                     		    : calcDeque.pop();
                     }

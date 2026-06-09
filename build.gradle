@@ -24,6 +24,10 @@ buildscript {
 apply plugin: 'application'
 apply plugin: 'com.github.johnrengelman.shadow'
 
+tasks.withType(AbstractArchiveTask).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 dependencies {
 
     api 'org.opensha:opensha-nshmp-lib:1.8.5-opensha.1'
@@ -38,6 +42,9 @@ dependencies {
 
     implementation project(path: ':opensha')
     implementation project(path: ':opensha', configuration: 'implResolvable')
+
+    implementation 'org.apache.parquet:parquet-avro:1.14.3'
+    implementation 'org.apache.avro:avro:1.11.3'
 
     testImplementation 'junit:junit:4.13.2'
 }

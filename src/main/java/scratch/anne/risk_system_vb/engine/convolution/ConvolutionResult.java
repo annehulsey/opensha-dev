@@ -43,4 +43,8 @@ public class ConvolutionResult {
 
         return cumulative;
     }
+    
+    public double getRisk() {
+    	return risk;
+    }
 }
