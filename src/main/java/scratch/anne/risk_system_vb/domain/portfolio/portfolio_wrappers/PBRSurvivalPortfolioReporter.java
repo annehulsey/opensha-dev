@@ -1,5 +1,7 @@
 package scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers;
 
+import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
+import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricType;
 import scratch.anne.risk_system_vb.domain.asset.fragility.*;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
@@ -75,6 +77,17 @@ public final class PBRSurvivalPortfolioReporter
     @Override
     public Set<String> getAssetIDs() {
         return base.getAssetIDs();
+    }
+    
+    @Override
+    public AssetType getAssetType() {
+    	// risk convolution portofolio already confirm homogeneity
+    	return assets.get(0).getAssetType();
+    }
+    
+    public RiskMetricType getRiskMetricType() {
+    	// risk convolution portofolio already confirm homogeneity
+    	return assets.get(0).getRiskMetricType();
     }
 
     @Override

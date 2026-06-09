@@ -3,6 +3,7 @@ package scratch.anne.risk_system_vb.domain.asset;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Base class for assets in a portfolio.
@@ -13,6 +14,7 @@ import java.util.Map;
 public abstract class AbstractAsset {
 
     protected final String assetID;
+    protected final AssetType assetType;
     protected final double lat;
     protected final double lon;
     protected final double vs30;
@@ -27,7 +29,7 @@ public abstract class AbstractAsset {
      * @param responseModel  Identifier for a vulnerability or fragility
      * @param additionalFields Map of additional CSV fields (nullable)
      */
-    protected AbstractAsset(String assetID, double lat, double lon, double vs30, String responseModel, Map<String, String> additionalFields) {
+    protected AbstractAsset(String assetID, double lat, double lon, double vs30, String responseModel, Map<String, String> additionalFields, AssetType assetType) {
         if (assetID == null) throw new IllegalArgumentException("Asset id must be non-null");
         if (responseModel == null) throw new IllegalArgumentException("Response model must be non-null");
         this.assetID = assetID;
@@ -36,6 +38,8 @@ public abstract class AbstractAsset {
         this.vs30 = vs30;
         this.responseModel = responseModel;
         this.additionalFields = additionalFields != null ? Collections.unmodifiableMap(new LinkedHashMap<>(additionalFields)) : Collections.emptyMap();
+        
+        this.assetType = Objects.requireNonNull(assetType);
     }
 
     public String getAssetID() { return assetID; }
@@ -51,9 +55,18 @@ public abstract class AbstractAsset {
         }
         return additionalFields.get(name);
     }
+    
+    public AssetType getAssetType() {
+    	return assetType;
+    }
 
     @Override
     public String toString() {
         return String.format("Asset[id=%s, lat=%.5f, lon=%.5f, vs30=%.1f, responseModel=%s]", assetID, lat, lon, vs30, responseModel);
+    }
+    
+    public enum AssetType {
+    	VULNERABILITY,
+        FRAGILITY,
     }
 }

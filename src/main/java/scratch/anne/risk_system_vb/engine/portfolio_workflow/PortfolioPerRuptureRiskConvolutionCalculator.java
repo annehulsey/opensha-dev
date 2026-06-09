@@ -12,20 +12,27 @@ import org.opensha.commons.data.Site;
 import org.opensha.commons.param.Parameter;
 import org.opensha.commons.data.function.DiscretizedFunc;
 import org.opensha.commons.data.function.ArbitrarilyDiscretizedFunc;
-import org.opensha.sha.calc.HazardCurveCalculator;
+import org.opensha.sha.calc.sourceFilters.SourceFilter;
 import org.opensha.sha.calc.sourceFilters.SourceFilterManager;
+import org.opensha.sha.calc.sourceFilters.SourceFilterUtils;
 import org.opensha.sha.earthquake.AbstractERF;
+import org.opensha.sha.earthquake.ProbEqkRupture;
+import org.opensha.sha.earthquake.ProbEqkSource;
+import org.opensha.sha.faultSurface.cache.SurfaceCachingPolicy;
+import org.opensha.sha.faultSurface.cache.SurfaceCachingPolicy.CacheTypes;
 import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.imr.ScalarIMR;
 import org.opensha.sha.imr.param.IntensityMeasureParams.PeriodParam;
 
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
-import scratch.anne.risk_system_vb.domain.hazard.HazardCurve;
-import scratch.anne.risk_system_vb.domain.hazard.HazardCurveCollection;
+import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricType;
+import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
+import scratch.anne.risk_system_vb.engine.accumulators.RuptureKey;
+import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
@@ -37,37 +44,45 @@ import scratch.anne.risk_system_vb.util.enums.IMT;
  * <ul>
  *   <li>Parallelization is performed at SiteKey level</li>
  *   <li>Loop over all siteKeys and imKeys to minimize hazard calculations</li>
+ *   <li>Loop over each rupture to accumulate risk results
  *   <li>InnerLoop over all relevant assets for risk calcs</li>
  * </ul>
 
  */
-public class PortfolioRiskConvolutionCalculator {
+public class PortfolioPerRuptureRiskConvolutionCalculator {
 
     private final RiskConvolutionPortfolio portfolio;
     private final SimpleImResponseLibrary responseLib;
     private final HazardParameters hazardParameters;
     private final RiskConvolution.IntegrationMethod integrationMethod;
     
+    private final RiskMetricType riskMetricType;
+    
     private final AbstractERF erf;
     private final AttenRelRef gmmRef;
     
     private final SourceFilterManager filterManager;
+    private final List<SourceFilter> sourceFilters;
 
-    HazardCurveCollection hazardCurves;
+    RuptureResultsCollection ruptureResults;
 
 
     /** full constructor */
-    public PortfolioRiskConvolutionCalculator(
+    public PortfolioPerRuptureRiskConvolutionCalculator(
             RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
             HazardParameters hazardParameters,
             RiskConvolution.IntegrationMethod integrationMethod
     ) {
-        this.portfolio = portfolio;
-        this.responseLib = responseLib;
-        this.hazardParameters = hazardParameters;
-        this.integrationMethod = integrationMethod;
+    	this.portfolio = portfolio;
+    	this.riskMetricType = portfolio.getRiskMetricType();
+        
+        
+    	this.responseLib = responseLib;
+    	this.hazardParameters = hazardParameters;
+    	this.integrationMethod = integrationMethod;
                 
+    	SurfaceCachingPolicy.force(CacheTypes.THREAD_LOCAL);
         try {
             this.erf = (AbstractERF)
                     Class.forName(hazardParameters.getErfName())
@@ -85,6 +100,7 @@ public class PortfolioRiskConvolutionCalculator {
         }
         
         this.filterManager = hazardParameters.buildSourceManager();  
+        this.sourceFilters = filterManager.getEnabledFilters();
         
         this.erf.getTimeSpan().setDuration(hazardParameters.getErfDuration());
         this.erf.updateForecast();
@@ -93,7 +109,7 @@ public class PortfolioRiskConvolutionCalculator {
     }
 
     /** default integration method */
-    public PortfolioRiskConvolutionCalculator(
+    public PortfolioPerRuptureRiskConvolutionCalculator(
             RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
             HazardParameters hazardParameters
@@ -105,16 +121,15 @@ public class PortfolioRiskConvolutionCalculator {
     /** hazard and risk calculation loops */
     public RiskConvolutionPortfolio computeRisk() {
     	
-    	hazardCurves = new HazardCurveCollection(hazardParameters);
+    	ruptureResults = RuptureResultsCollection.fromERF(erf, hazardParameters);
 
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
-        ArrayDeque<HazardCurveCalculator> calcDeque = new ArrayDeque<>();
 
         ScalarIMR baseGmm = gmmRef.get();
 
         List<SiteKey> siteKeys = new ArrayList<>(portfolio.getSiteKeys());
 
-        int totalHazardCurves = countTotalSiteImKeys();
+        int totalSiteImKeys = countTotalSiteImKeys();
         AtomicInteger counter = new AtomicInteger();
 
         long startTime = System.nanoTime();
@@ -147,19 +162,11 @@ public class PortfolioRiskConvolutionCalculator {
             futures.add(CompletableFuture.runAsync(() -> {
 
                 ScalarIMR gmm = null;
-                HazardCurveCalculator calc = null;
 
                 try {
 
                     synchronized (gmmDeque) {
                         gmm = gmmDeque.isEmpty() ? gmmRef.get() : gmmDeque.pop();
-                    }
-
-                    synchronized (calcDeque) {
-                    	calc = calcDeque.isEmpty()
-                    			// filter erf when doing the hazard calculation
-                    		    ? new HazardCurveCalculator(filterManager)
-                    		    : calcDeque.pop();
                     }
 
                     gmm.setSite(site);
@@ -173,7 +180,7 @@ public class PortfolioRiskConvolutionCalculator {
 //                            gmm.getParameter(PeriodParam.NAME)
 //                                    .setValue(imt.period);
                         
-                        	// work around for invalid period value
+                        	// ----  work around for invalid period value ----
                         	// snap to nearest valid value
                         	//TODO find better solution for invalid gmm periods
                         	Parameter<Double> p =
@@ -198,59 +205,81 @@ public class PortfolioRiskConvolutionCalculator {
 
                         for (double x : imKey.getLogValues())
                             hazFunc.set(x, 0d);
-                       
                         
-                        hazFunc = calc.getHazardCurve(hazFunc, site, gmm, erf);
-
-                        switch (hazardParameters.getHazardMetric()) {
-
-                            case PROBABILITY_EXCEEDANCE:
-                                // already correct
-                                break;
-
-                            case RATE_EXCEEDANCE:
-                                // average rate over full ERF duration (not annualized)
-                                hazFunc = calc.getAnnualizedRates(hazFunc, 1.0);
-                                break;
-
-                            default:
-                                throw new IllegalArgumentException(
-                                    "Hazard metric not supported for risk convolution class: " + hazardParameters.getHazardMetric()
-                                );
-                        }
                         
-                        double[] hazard = new double[hazFunc.size()];
-                        for (int j = 0; j < hazard.length; j++)
-                            hazard[j] = hazFunc.getY(j);
-
-                        hazardCurves.put(
-                                siteKey,
-                                imKey,
-                                new HazardCurve(hazard)
-                        );
-                        
-                        for (RiskConvolutionAsset asset :
-                            portfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
-
-	                        RiskConvolution riskCalc = new RiskConvolution(
-	                                responseLib.getByName(asset.getModelName()),
-	                                hazard,
-	                                integrationMethod
-	                        );
+                        for (int sourceID = 0; sourceID < erf.getNumSources(); sourceID++) {
+                            ProbEqkSource source = erf.getSource(sourceID);
+                            if (SourceFilterUtils.canSkipSource(sourceFilters, source, site)) {
+                                // source is outside filter limits
+                                continue;
+                            }          
+                            
+                            for (int ruptureID = 0; ruptureID < source.getNumRuptures(); ruptureID++) {
+                                ProbEqkRupture rupture = source.getRupture(ruptureID);
+	                            if (SourceFilterUtils.canSkipRupture(sourceFilters, rupture, site)) {
+	                                // rupture is outside filter limits
+	                                continue;
+	                            }
+	                            RuptureKey rupKey = new RuptureKey(sourceID, ruptureID);
 	
-	                        asset.setRiskConvolutionResult(riskCalc.compute());
+	                            gmm.getExceedProbabilities(rupture, hazFunc);
+			
+		                        switch (hazardParameters.getHazardMetric()) {
+		
+		                            case PROBABILITY_EXCEEDANCE:
+		                                // already correct
+		                                break;
+		
+		                            case RATE_EXCEEDANCE:
+		                                // also uses the conditional exceedance probability
+		                            	// since the rate vs probability is addressed in the rupture likelihood 
+		                                break;
+		
+		                            default:
+		                                throw new IllegalArgumentException(
+		                                    "Hazard metric not supported for risk convolution class: " + hazardParameters.getHazardMetric()
+		                                );
+		                        }
+		                        
+		                        double[] hazard = new double[hazFunc.size()];
+		                        for (int j = 0; j < hazard.length; j++)
+		                            hazard[j] = hazFunc.getY(j);
+			                        
+			                        for (RiskConvolutionAsset asset :
+			                            portfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
+	
+			                        	// get asset value, defaults to 1 if not assessing expected loss
+			                        	double assetValue = 1.0;
+										if (riskMetricType == RiskMetricType.EXPECTED_LOSS) {
+											ExpectedLossAsset vulnAsset = (ExpectedLossAsset) asset;
+											assetValue = vulnAsset.getValue();
+										}
+			                        	
+				                        RiskConvolution riskCalc = new RiskConvolution(
+				                                responseLib.getByName(asset.getModelName()),
+				                                hazard,
+				                                integrationMethod
+				                        );
+				
+				                        //TODO add rupture-by-rupture for failure probability, but not with accumulation over assets
+				                        double assetLossForRupture = assetValue * riskCalc.compute().getRisk();
+				                        
+				                        ruptureResults.accumulateRuptureLoss(rupKey, assetLossForRupture);
+				                        
+			                        }
+		                        }
                         }
 
                         // ----- PROGRESS -----
                         int done = counter.incrementAndGet();
 
-                        if (done % 100 == 0 || done == totalHazardCurves) {
+                        if (done % 100 == 0 || done == totalSiteImKeys) {
 
                             long now = System.nanoTime();
 
                             double elapsed = (now - startTime) / 1e9;
                             double rate = done / elapsed;
-                            double etaSeconds = (totalHazardCurves - done) / rate;
+                            double etaSeconds = (totalSiteImKeys - done) / rate;
 
                             LocalTime currentTime = LocalTime.now();
                             LocalTime etaTime = currentTime.plusSeconds((long) etaSeconds);
@@ -259,10 +288,10 @@ public class PortfolioRiskConvolutionCalculator {
                                     DateTimeFormatter.ofPattern("h:mm:ss a");
 
                             System.out.printf(
-                                    "Hazard %d / %d (%.1f%%) | %.1f sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
+                                    "Site/IM %d / %d (%.1f%%) | %.1f sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
                                     done,
-                                    totalHazardCurves,
-                                    100.0 * done / totalHazardCurves,
+                                    totalSiteImKeys,
+                                    100.0 * done / totalSiteImKeys,
                                     rate,
                                     currentTime.format(fmt),
                                     etaTime.format(fmt),
@@ -273,17 +302,17 @@ public class PortfolioRiskConvolutionCalculator {
 
                 } finally {
                     if (gmm != null) synchronized (gmmDeque) { gmmDeque.push(gmm); }
-                    if (calc != null) synchronized (calcDeque) { calcDeque.push(calc); }
+
                 }
             }));
         }
 
         futures.forEach(CompletableFuture::join);
 
-        hazardCurves.freeze();
-        portfolio.setHazardCurves(hazardCurves);
+        ruptureResults.freeze();
+        portfolio.setRuptureResults(ruptureResults);
         
-        portfolio.setConvolutionMode(ConvolutionMode.FULL_HCURVE);
+        portfolio.setConvolutionMode(ConvolutionMode.PER_RUPTURE);
        
         
         double elapsedSeconds = (System.nanoTime() - startTime) / 1e9;

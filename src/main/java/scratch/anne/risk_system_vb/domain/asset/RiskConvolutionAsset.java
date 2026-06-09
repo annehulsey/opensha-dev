@@ -6,6 +6,8 @@ import scratch.anne.risk_system_vb.engine.convolution.ConvolutionResult;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 
 public abstract class RiskConvolutionAsset extends AbstractAsset {
+	
+	private RiskMetricType riskMetricType;
 
     protected RiskConvolutionAsset(
             String assetID,
@@ -13,9 +15,12 @@ public abstract class RiskConvolutionAsset extends AbstractAsset {
             double lon,
             double vs30,
             String modelName,
-            Map<String, String> additionalFields
+            Map<String, String> additionalFields,
+            AssetType assetType,
+            RiskMetricType riskMetricType
     ) {
-        super(assetID, lat, lon, vs30, modelName, additionalFields);
+        super(assetID, lat, lon, vs30, modelName, additionalFields, assetType);
+        this.riskMetricType = riskMetricType;
     }
     
     private ImKey imKey;
@@ -30,4 +35,14 @@ public abstract class RiskConvolutionAsset extends AbstractAsset {
     public void setImKey(ImKey imKey) {
         this.imKey = imKey;
     }
+    public RiskMetricType getRiskMetricType() {
+    	return riskMetricType;
+    }
+    
+    public enum RiskMetricType {
+    	EXPECTED_LOSS,
+        FAILURE_PROBABILITY,
+        PBR_SURVIVAL
+    }
+    
 }

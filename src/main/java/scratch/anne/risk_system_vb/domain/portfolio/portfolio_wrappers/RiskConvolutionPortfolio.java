@@ -1,7 +1,9 @@
 package scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers;
 
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset;
+import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
+import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricType;
 import scratch.anne.risk_system_vb.domain.asset.fragility.FailureProbabilityAsset;
 import scratch.anne.risk_system_vb.domain.asset.fragility.FragilityAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
@@ -13,7 +15,10 @@ import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponse;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
+import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
+import scratch.anne.risk_system_vb.io.writers.FileFormat;
 import scratch.anne.risk_system_vb.io.writers.HazardCurvesExporter;
+import scratch.anne.risk_system_vb.io.writers.RuptureResultsExporter;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.Metadata;
@@ -22,8 +27,6 @@ import scratch.anne.risk_system_vb.util.PortfolioGroupingUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.nio.file.Path;
-
-import org.apache.commons.lang3.function.TriConsumer;
 
 /**
  * Projection of a base Portfolio into a calculation-ready working set of RiskConvolutionAssets.
@@ -42,6 +45,8 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
 
     private final List<RiskConvolutionAsset> assets;
     private final Map<String, RiskConvolutionAsset> assetsById;
+    private final AssetType assetType;
+    private final RiskMetricType riskMetricType;
 
     // ---------------------------------------------------------------------
     // Canonical per-asset keys (single source of truth)
@@ -71,6 +76,12 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
 	 // ---------------------------------------------------------------------
 	
     private HazardCurveCollection hazardCurves;
+    
+	 // ---------------------------------------------------------------------
+	 // Rupture results (used when ConvolutionMode.PER_RUPTURE)
+	 // ---------------------------------------------------------------------
+	
+   private RuptureResultsCollection ruptureResults;
 
     // ---------------------------------------------------------------------
     // Construction
@@ -120,6 +131,11 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
         }
 
         this.assets = List.copyOf(projected);
+        
+        validateHomogeneous(assets);
+        this.assetType = assets.get(0).getAssetType();
+        this.riskMetricType = assets.get(0).getRiskMetricType();
+        
         this.imKeyByAsset = Collections.unmodifiableMap(tmpIm);
         this.siteKeyByAsset = Collections.unmodifiableMap(tmpSite);
 
@@ -252,6 +268,15 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
     public Set<String> getAssetIDs() {
         return assetsById.keySet();
     }
+    
+    @Override
+    public AssetType getAssetType() {
+    	return assetType;
+    }
+    
+    public RiskMetricType getRiskMetricType() {
+    	return riskMetricType;
+    }
 
     @Override
     public RiskConvolutionAsset getAssetByID(String id) {
@@ -352,7 +377,7 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
     public enum ConvolutionMode {
 	    UNCOMPUTED,
 	    FULL_HCURVE,
-	    RUPTURE_BY_RUPTURE
+	    PER_RUPTURE
 	}
     
     public void setConvolutionMode(ConvolutionMode convolutionMode) {
@@ -416,5 +441,42 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
                 imKey.getLinearValues(),
                 curve.getHazard()
         );
+    }
+    
+    // ----- rupture results storage helpers ---------   
+    public void setRuptureResults(RuptureResultsCollection ruptureResults) {
+        this.ruptureResults = ruptureResults;
+    }
+    
+    
+    public RuptureResultsCollection getRuptureResults() {
+        return ruptureResults;
+    }
+    
+    
+    public void exportRuptureResults(Path file) {
+        exportRuptureResults(file, FileFormat.CSV);
+    }
+
+    public void exportRuptureResults(Path file, FileFormat format) {
+        new RuptureResultsExporter()
+                .export(ruptureResults, file, format);
+    }
+    
+    private void validateHomogeneous(List<RiskConvolutionAsset> assets) {
+        if (assets == null || assets.isEmpty()) {
+            return;
+        }
+
+        RiskMetricType type = assets.get(0).getRiskMetricType();
+
+        for (RiskConvolutionAsset asset : assets) {
+            if (asset.getRiskMetricType() != type) {
+                throw new IllegalArgumentException(
+                    "Portfolio must contain homogeneous risk metric types. Expected " 
+                    + type + " but found " + asset.getRiskMetricType()
+                );
+            }
+        }
     }
 }

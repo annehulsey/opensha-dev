@@ -2,6 +2,8 @@ package scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers;
 
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
+import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
+import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricType;
 import scratch.anne.risk_system_vb.domain.asset.fragility.FailureProbabilityAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
@@ -70,6 +72,17 @@ public final class ProbFailurePortfolioReporter
     @Override
     public FailureProbabilityAsset getAssetByID(String assetID) {
         return (FailureProbabilityAsset) base.getAssetByID(assetID);
+    }
+    
+    @Override
+    public AssetType getAssetType() {
+    	// risk convolution portofolio already confirm homogeneity
+    	return assets.get(0).getAssetType();
+    }
+    
+    public RiskMetricType getRiskMetricType() {
+    	// risk convolution portofolio already confirm homogeneity
+    	return assets.get(0).getRiskMetricType();
     }
 
     @Override

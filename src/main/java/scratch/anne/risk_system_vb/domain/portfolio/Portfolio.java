@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset;
+import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
 import scratch.anne.risk_system_vb.util.Metadata;
 import scratch.anne.risk_system_vb.util.PortfolioGroupingUtils;
@@ -30,6 +31,8 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
 
     private final List<T> assets;
     private final Map<String, T> assetMap;
+    
+    private final AssetType assetType;
 
     /** Site grouping (lat, lon, vs30) */
     private final Map<SiteKey, List<T>> siteMap;
@@ -60,6 +63,7 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
         }
 
         validateHomogeneous(assets);
+        this.assetType = assets.get(0).getAssetType();
 
         // -------------------------
         // Core immutable storage
@@ -130,11 +134,17 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
     // ------------------------------------------------------------------------
 
     private void validateHomogeneous(List<T> assets) {
-        Class<?> clazz = assets.get(0).getClass();
+        if (assets == null || assets.isEmpty()) {
+            return;
+        }
+
+        AssetType type = assets.get(0).getAssetType();
+
         for (T asset : assets) {
-            if (!asset.getClass().equals(clazz)) {
+            if (asset.getAssetType() != type) {
                 throw new IllegalArgumentException(
-                        "Portfolio must contain homogeneous asset types"
+                    "Portfolio must contain homogeneous asset types. Expected " 
+                    + type + " but found " + asset.getAssetType()
                 );
             }
         }
@@ -153,6 +163,12 @@ public class Portfolio<T extends AbstractAsset> implements PortfolioGetters<T> {
     public Set<String> getAssetIDs() {
         return assetMap.keySet();
     }
+    
+    @Override
+    public AssetType getAssetType() {
+    	return assetType;
+    }
+    
 
     @Override
     public T getAssetByID(String assetID) {
