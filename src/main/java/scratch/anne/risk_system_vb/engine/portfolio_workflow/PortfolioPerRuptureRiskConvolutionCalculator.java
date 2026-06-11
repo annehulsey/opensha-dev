@@ -34,6 +34,7 @@ import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLi
 import scratch.anne.risk_system_vb.engine.accumulators.RuptureKey;
 import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
+import scratch.anne.risk_system_vb.io.writers.AssetRiskForRuptureWriter;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
 import scratch.anne.risk_system_vb.util.StringUtil.ImtPeriod;
@@ -65,14 +66,15 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
     private final List<SourceFilter> sourceFilters;
 
     RuptureResultsCollection ruptureResults;
-
+    private final AssetRiskForRuptureWriter assetWriter;
 
     /** full constructor */
     public PortfolioPerRuptureRiskConvolutionCalculator(
             RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
             HazardParameters hazardParameters,
-            RiskConvolution.IntegrationMethod integrationMethod
+            RiskConvolution.IntegrationMethod integrationMethod,
+            AssetRiskForRuptureWriter assetWriter
     ) {
     	this.portfolio = portfolio;
     	this.riskMetricType = portfolio.getRiskMetricType();
@@ -106,16 +108,44 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
         this.erf.updateForecast();
       
         this.gmmRef = AttenRelRef.valueOf(hazardParameters.getGmmName().toUpperCase());
+        
+        this.assetWriter = assetWriter;
+
     }
 
-    /** default integration method */
+    /** specify integration method but no asset writer */
+    public PortfolioPerRuptureRiskConvolutionCalculator(
+            RiskConvolutionPortfolio portfolio,
+            SimpleImResponseLibrary responseLib,
+            HazardParameters hazardParameters,
+            RiskConvolution.IntegrationMethod integrationMethod
+    ) {
+        this(portfolio, responseLib, hazardParameters,
+                integrationMethod,
+                null);
+    }
+    
+    /** default integration method with asset writer */
+    public PortfolioPerRuptureRiskConvolutionCalculator(
+            RiskConvolutionPortfolio portfolio,
+            SimpleImResponseLibrary responseLib,
+            HazardParameters hazardParameters,
+            AssetRiskForRuptureWriter assetWriter
+    ) {
+        this(portfolio, responseLib, hazardParameters,
+                RiskConvolution.IntegrationMethod.CLOSED_FORM,
+                assetWriter);
+    }
+    
+    /** default integration method and no asset writer */
     public PortfolioPerRuptureRiskConvolutionCalculator(
             RiskConvolutionPortfolio portfolio,
             SimpleImResponseLibrary responseLib,
             HazardParameters hazardParameters
     ) {
         this(portfolio, responseLib, hazardParameters,
-                RiskConvolution.IntegrationMethod.CLOSED_FORM);
+                RiskConvolution.IntegrationMethod.CLOSED_FORM,
+                null);
     }
 
     /** hazard and risk calculation loops */
@@ -133,6 +163,11 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
         AtomicInteger counter = new AtomicInteger();
 
         long startTime = System.nanoTime();
+        
+        System.out.printf(
+                "%nRunning per-rupture loop for %d Site & Im Keys %n",
+                totalSiteImKeys
+        );
 
         List<Site> sites = new ArrayList<>();
 
@@ -220,7 +255,6 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
 	                                // rupture is outside filter limits
 	                                continue;
 	                            }
-	                            RuptureKey rupKey = new RuptureKey(sourceID, ruptureID);
 	
 	                            gmm.getExceedProbabilities(rupture, hazFunc);
 			
@@ -261,10 +295,24 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
 				                                integrationMethod
 				                        );
 				
-				                        //TODO add rupture-by-rupture for failure probability, but not with accumulation over assets
-				                        double assetLossForRupture = assetValue * riskCalc.compute().getRisk();
+				                        double assetRiskForRupture = assetValue * riskCalc.compute().getRisk();
 				                        
-				                        ruptureResults.accumulateRuptureLoss(rupKey, assetLossForRupture);
+//				                        if (assetWriter != null) {	                        						                        		
+//				                        		assetWriter.write(asset.getAssetID(), sourceID, ruptureID, assetRiskForRupture);
+//				                        }
+				                        
+				                        if (assetWriter != null) { 
+				                        	synchronized(assetWriter) { 
+				                        		assetWriter.write(asset.getAssetID(), sourceID, ruptureID, assetRiskForRupture); 
+				                        		} 
+				                        	}
+				                        
+				                        // if the risk is loss, accumulate it over the rupture
+				                        if (riskMetricType == RiskMetricType.EXPECTED_LOSS) {
+				                        	double assetLossForRupture = assetRiskForRupture;
+				                        	ruptureResults.accumulateRuptureLoss(new RuptureKey(sourceID, ruptureID), assetLossForRupture);
+				                        }
+				                        
 				                        
 			                        }
 		                        }
@@ -288,7 +336,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
                                     DateTimeFormatter.ofPattern("h:mm:ss a");
 
                             System.out.printf(
-                                    "Site/IM %d / %d (%.1f%%) | %.1f sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
+                                    "Site/IM %d / %d (%.1f%%) | %.2g sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
                                     done,
                                     totalSiteImKeys,
                                     100.0 * done / totalSiteImKeys,
@@ -313,21 +361,24 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
         portfolio.setRuptureResults(ruptureResults);
         
         portfolio.setConvolutionMode(ConvolutionMode.PER_RUPTURE);
+        
+        if (assetWriter != null) {
+        	assetWriter.close();
+        }
        
         
         double elapsedSeconds = (System.nanoTime() - startTime) / 1e9;
 
         if (elapsedSeconds >= 3600) {
-            System.out.printf("Completed in %.1f hours%n",
-                    elapsedSeconds / 3600.0);
-        } else if (elapsedSeconds >= 60) {
-            System.out.printf("Completed in %.1f minutes%n",
-                    elapsedSeconds / 60.0);
-        } else {
-            System.out.printf("Completed in %.1f seconds%n",
-                    elapsedSeconds);
-        }
-        
+	            System.out.printf("Completed in %.1f hours%n",
+	                    elapsedSeconds / 3600.0);
+	        } else if (elapsedSeconds >= 60) {
+	            System.out.printf("Completed in %.1f minutes%n",
+	                    elapsedSeconds / 60.0);
+	        } else {
+	            System.out.printf("Completed in %.1f seconds%n",
+	                    elapsedSeconds);
+	        }
         
         
         return portfolio;

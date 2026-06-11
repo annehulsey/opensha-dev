@@ -46,6 +46,8 @@ public class PortfolioELossCalculationTesting {
 		List<IntegrationMethod>   integrationMethods = List.of(IntegrationMethod.RIEMANN);
 		List<ConvolutionMode>     convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
 		
+		boolean keepAssetLoss = true;
+		
 		// ---------------------------------------------
 		
 		Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
@@ -147,7 +149,7 @@ public class PortfolioELossCalculationTesting {
             		            writeRow(w, variableNames, totalValue);
             		            w.flush();
             		        }
-            		        else if (convolutionMode == ConvolutionMode.PER_RUPTURE) {
+            		        else if (convolutionMode == ConvolutionMode.PER_RUPTURE) {           		        	
             		            PortfolioPerRuptureRiskConvolutionCalculator calculator =
             		                    new PortfolioPerRuptureRiskConvolutionCalculator(
             		                            riskConvolutionPortfolio,
