@@ -44,8 +44,9 @@ dependencies {
     implementation project(path: ':opensha')
     implementation project(path: ':opensha', configuration: 'implResolvable')
 
-    implementation 'org.apache.parquet:parquet-avro:1.14.3'
-    implementation 'org.apache.avro:avro:1.11.3'
+    implementation 'org.apache.hadoop:hadoop-common:3.5.0'
+    implementation 'org.apache.parquet:parquet-avro:1.15.1'
+    implementation 'org.apache.avro:avro:1.12.1'
 
     testImplementation 'junit:junit:4.12'
 }

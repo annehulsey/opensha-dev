@@ -137,18 +137,9 @@ public class PortfolioPerRuptureExpectedLossCalcByCSV {
         	    riskConvolutionPortfolio.getRuptureResults().getTotalLoss()
         	);
         
-        
-//        ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
-//        aggregator.printSummary();
-
-//        // ------------------- 10. Write outputs to run folder -------------------
-//        aggregator.writeCSV(outputCSV);
-//        aggregator.writeAggregatedCSV(aggregatedOutputCSV);
-//
         System.out.println("Outputs written to run folder:");
         System.out.println(outputCSV);
-//        System.out.println(aggregatedOutputCSV);
-//        System.out.println(hazardJson);
+
         
     }
 

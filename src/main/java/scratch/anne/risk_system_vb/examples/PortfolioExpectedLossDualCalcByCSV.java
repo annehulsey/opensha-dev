@@ -18,6 +18,7 @@ import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvol
 import scratch.anne.risk_system_vb.io.readers.ParseRiskRunParametersCSV;
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
+import scratch.anne.risk_system_vb.io.writers.AssetRiskForRuptureWriter;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 import scratch.anne.risk_system_vb.util.StringUtil;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
@@ -27,15 +28,20 @@ import scratch.anne.risk_system_vb.util.IO;
  * Fully dynamic CSV-driven Expected Loss Portfolio runner with input verification.
  */
 public class PortfolioExpectedLossDualCalcByCSV {
+		
+//	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\rate\\porter_vulns");
+//	public static Path inputFolder = Path.of("PorterVulns_vs-360");
 	
-	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
+	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
+	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio_Riemann");
+	
+//	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
+	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
+	public static boolean writeHazard = true;
+	public static boolean keepAssetLoss = true;
+	
 
     public static void main(String[] args) throws Exception {
-    	
-    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\rate\\porter_vulns");
-    	Path inputFolder = Path.of("PorterVulns_vs-360");
-    	
-    	boolean writeHazard = true;
 
         Path runFolder = baseFolder.resolve(inputFolder);
 
@@ -71,6 +77,11 @@ public class PortfolioExpectedLossDualCalcByCSV {
         Path hazardJson = writeHazard
                 ? runFolder.resolve(fileTag + "_hazard-list.json")
                 : null;
+        
+        Files.deleteIfExists(runFolder.resolve(fileTag + "_asset-risk-per-rup.parquet"));
+        AssetRiskForRuptureWriter assetWriter = keepAssetLoss
+        		? new AssetRiskForRuptureWriter(runFolder.resolve(fileTag + "_asset-risk-per-rup.parquet"))
+        		: null;
 
         
         // ------------------- 3. prepare hazard and integration parameters ----------------
@@ -144,7 +155,8 @@ public class PortfolioExpectedLossDualCalcByCSV {
 	                            riskConvolutionPortfolio,
 	                            expVulnLib,
 	                            hazardParameters,
-	                            integrationMethod
+	                            integrationMethod,
+	                            assetWriter
 	                    );
 	            
 	            riskConvolutionPortfolio = calculator.computeRisk();

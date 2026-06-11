@@ -114,10 +114,15 @@ public class PortfolioRiskConvolutionCalculator {
 
         List<SiteKey> siteKeys = new ArrayList<>(portfolio.getSiteKeys());
 
-        int totalHazardCurves = countTotalSiteImKeys();
+        int totalSiteImKeys = countTotalSiteImKeys();
         AtomicInteger counter = new AtomicInteger();
 
         long startTime = System.nanoTime();
+        
+        System.out.printf(
+                "%nRunning hazard curve loop for %d Site & Im Keys %n",
+                totalSiteImKeys
+        );
 
         List<Site> sites = new ArrayList<>();
 
@@ -244,13 +249,13 @@ public class PortfolioRiskConvolutionCalculator {
                         // ----- PROGRESS -----
                         int done = counter.incrementAndGet();
 
-                        if (done % 100 == 0 || done == totalHazardCurves) {
+                        if (done % 100 == 0 || done == totalSiteImKeys) {
 
                             long now = System.nanoTime();
 
                             double elapsed = (now - startTime) / 1e9;
                             double rate = done / elapsed;
-                            double etaSeconds = (totalHazardCurves - done) / rate;
+                            double etaSeconds = (totalSiteImKeys - done) / rate;
 
                             LocalTime currentTime = LocalTime.now();
                             LocalTime etaTime = currentTime.plusSeconds((long) etaSeconds);
@@ -261,8 +266,8 @@ public class PortfolioRiskConvolutionCalculator {
                             System.out.printf(
                                     "Hazard %d / %d (%.1f%%) | %.1f sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
                                     done,
-                                    totalHazardCurves,
-                                    100.0 * done / totalHazardCurves,
+                                    totalSiteImKeys,
+                                    100.0 * done / totalSiteImKeys,
                                     rate,
                                     currentTime.format(fmt),
                                     etaTime.format(fmt),
