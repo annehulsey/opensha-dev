@@ -46,7 +46,7 @@ public class RiskConvolution {
             throw new IllegalArgumentException("response IM and hazard array lengths must match");
         }
         this.response = response;
-        this.hazardValues = (hazard != null) ? hazard.clone() : null;
+        this.hazardValues = (hazard != null) ? hazard : null;
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
     }
 
@@ -101,7 +101,7 @@ public class RiskConvolution {
             throw new IllegalArgumentException("IM, F(IM), and hazard arrays must all be the same length");
         }
         this.response = new SimpleImResponseFunction(imls, fim);
-        this.hazardValues = hazard.clone();
+        this.hazardValues = hazard;
         this.method = (method != null) ? method : IntegrationMethod.RIEMANN;
     }
 
@@ -186,7 +186,7 @@ public class RiskConvolution {
         if (hazard.length != response.getImValues().length) {
             throw new IllegalArgumentException("Hazard array length does not match vulnerability IM length");
         }
-        this.hazardValues = hazard.clone();
+        this.hazardValues = hazard;
         return computeInternal(hazardValues);
     }
 
@@ -202,49 +202,55 @@ public class RiskConvolution {
      * Shared internal computation, chooses method based on this.method
      */
     private ConvolutionResult computeInternal(double[] hazardValues) {
-        switch (method) {
-            case RIEMANN:
-                return computeRiemann(hazardValues);
-            case CLOSED_FORM:
-                return computeClosedForm(hazardValues);
-            default:
-                throw new IllegalStateException("Unsupported integration method: " + method);
+        if (method == IntegrationMethod.RIEMANN) {
+            return computeRiemann(hazardValues);
+        } else {
+            return computeClosedForm(hazardValues);
         }
     }
+    
     // ---------------------- Core Riemann Integration ----------------------
-    private ConvolutionResult computeRiemann(double[] hazard) {
+    private ConvolutionResult computeRiemann(double[] hazardValues) {
         
-    	double[] imls = response.getImValues();
-        double[] respMid = response.getRespMid();
-        int n = respMid.length;
+    	final double[] hazard = hazardValues;
+        final double[] respMid = response.getRespMid();
+        final int n = respMid.length;
         
         double risk = 0.0;
         double[] contribution = new double[n];
 
+        
         // interior bins
+        double hazLeft = hazard[0];
         for (int i = 0; i < respMid.length - 1; i++) {
-            double deltaHazard = hazardValues[i] - hazardValues[i + 1];
+        	double hazRight = hazard[i + 1];
+            double deltaHazard = hazLeft - hazRight;
+        	hazLeft = hazRight;
             contribution[i] = respMid[i] * deltaHazard;
             risk += contribution[i];
         }
 
         // tail bin
-        contribution[n - 1] = respMid[n - 1] * hazardValues[n - 1];
+        contribution[n - 1] = respMid[n - 1] * hazard[n - 1];
         risk += contribution[n - 1];
 
-        return new ConvolutionResult(imls, contribution, risk);
+        return new ConvolutionResult(response.getImValues(), contribution, risk);
     }
 
 
     // ---------------------- Porter Closed-Form Integration ----------------------
     private ConvolutionResult computeClosedForm(double[] hazardValues) {
-        double[] imls = response.getImValues();
-        double[] respEdge = response.getRespEdges();
+    	
+
+        final double[] imls = response.getImValues();
+        final double[] respEdge = response.getRespEdges();
+
+        final int n = imls.length;
 
         double risk = 0.0;
-        double[] contribution = new double[imls.length];
+        double[] contribution = new double[n];
 
-        for (int i = 1; i < imls.length; i++) {
+        for (int i = 1; i < n; i++) {
             double imlDelta = imls[i] - imls[i - 1];
             double respDelta = respEdge[i] - respEdge[i - 1];
 
