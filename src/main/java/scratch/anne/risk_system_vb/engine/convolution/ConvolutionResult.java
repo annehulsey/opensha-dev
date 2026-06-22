@@ -2,16 +2,17 @@ package scratch.anne.risk_system_vb.engine.convolution;
 
 public class ConvolutionResult {
 
-	public final double[] imls;
-    public final double risk;
-    public final double[] disaggContribution;
-    public final double[] disaggCumulative;
+	private final double[] imls;
+    private final double risk;
+    private final double[] disaggContribution;
+
+    private double[] disaggCumulative;
 
     public ConvolutionResult(double[] imls, double[] disaggContribution, double risk) {
     	this.imls = imls;
         this.risk = risk;
         this.disaggContribution = disaggContribution.clone();
-        this.disaggCumulative = buildCumulative(this.disaggContribution);
+        this.disaggCumulative = null;  // only computed if called
     }
     
     private static double[] buildCumulative(double[] contribution) {
@@ -44,7 +45,22 @@ public class ConvolutionResult {
         return cumulative;
     }
     
+    public double[] getImls() {
+    	return imls;
+    }
+    
     public double getRisk() {
     	return risk;
+    }
+    
+    public double[] getDisaggContribution() {
+        return disaggContribution;
+    }
+
+    public double[] getDisaggCumulative() {
+        if (disaggCumulative == null) {
+            disaggCumulative = buildCumulative(disaggContribution);
+        }
+        return disaggCumulative;
     }
 }
