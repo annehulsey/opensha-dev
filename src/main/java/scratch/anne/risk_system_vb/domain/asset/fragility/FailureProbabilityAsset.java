@@ -43,7 +43,7 @@ public class FailureProbabilityAsset extends RiskConvolutionAsset{
 	@Override
 	public void setRiskConvolutionResult(ConvolutionResult result) {
 		this.riskResult = result;
-		this.probabilityOfFailure = result.risk;
+		this.probabilityOfFailure = result.getRisk();
 		
 	}
 

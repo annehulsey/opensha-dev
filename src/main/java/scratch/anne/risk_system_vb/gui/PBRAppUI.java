@@ -638,10 +638,10 @@ public class PBRAppUI extends JFrame {
 
             this.fragilityProbability = fragility.getRespEdges();
             
-            this.disaggCumulative = riskResult.disaggCumulative;
+            this.disaggCumulative = riskResult.getDisaggCumulative();
             this.disaggBounds = imlsAtMarkers(
             		imls,
-            		riskResult.disaggCumulative,
+            		disaggCumulative,
                     disaggMarkerValues);
         }
         
