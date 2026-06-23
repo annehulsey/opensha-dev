@@ -40,7 +40,7 @@ public final class RuptureResultsCollection {
         
         this.ruptureLikelihoods = ruptureLikelihoods;
         
-        this.accumulator = new RuptureLossAccumulator();
+        this.accumulator = new RuptureLossAccumulator(ruptureLikelihoods.keySet());
         
         this.totalLoss = 0.0;
         this.lossContributions = new LinkedHashMap<>();
