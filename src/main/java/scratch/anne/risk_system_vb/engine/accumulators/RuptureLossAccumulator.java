@@ -1,5 +1,6 @@
 package scratch.anne.risk_system_vb.engine.accumulators;
 
+import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.DoubleAdder;
 
@@ -16,8 +17,21 @@ public final class RuptureLossAccumulator {
     /**
      * Key → accumulated loss
      */
-    private final ConcurrentHashMap<RuptureKey, DoubleAdder> lossByRupture =
-            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<RuptureKey, DoubleAdder> lossByRupture;
+            
+    
+    /**
+     * Pre-populates an empty DoubleAdder for every rupture.
+     */    
+    public RuptureLossAccumulator(
+            Collection<RuptureKey> ruptureKeys) {
+
+        this.lossByRupture =
+                new ConcurrentHashMap<>(ruptureKeys.size());
+
+        for (RuptureKey key : ruptureKeys)
+            lossByRupture.put(key, new DoubleAdder());
+    }
 
     /**
      * Adds loss contribution for a rupture.
@@ -28,9 +42,12 @@ public final class RuptureLossAccumulator {
         if (frozen)
             throw new IllegalStateException(
                 "RuptureLossAccumulator is frozen");
-        lossByRupture
-                .computeIfAbsent(key, k -> new DoubleAdder())
-                .add(loss);
+        
+        DoubleAdder adder = lossByRupture.get(key);
+        if (adder == null) {
+            throw new IllegalArgumentException("Unknown rupture key: " + key);
+        }
+        adder.add(loss);
     }
 
     /**
@@ -39,7 +56,12 @@ public final class RuptureLossAccumulator {
      */
     public double getLoss(RuptureKey key) {
         DoubleAdder adder = lossByRupture.get(key);
-        return adder == null ? 0.0 : adder.sum();
+
+        if (adder == null)
+            throw new IllegalArgumentException(
+                "Unknown rupture key: " + key);
+
+        return adder.sum();
     }
 
     /**
