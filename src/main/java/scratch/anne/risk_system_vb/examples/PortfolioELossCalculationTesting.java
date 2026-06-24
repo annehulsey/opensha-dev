@@ -45,8 +45,7 @@ public class PortfolioELossCalculationTesting {
 		List<HazardMetric>        hazardMetrics = List.of(HazardMetric.RATE_EXCEEDANCE);
 		List<IntegrationMethod>   integrationMethods = List.of(IntegrationMethod.RIEMANN);
 		List<ConvolutionMode>     convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
-		
-		boolean keepAssetLoss = true;
+//		List<ConvolutionMode>     convolutionModes = List.of(ConvolutionMode.FULL_HCURVE);
 		
 		// ---------------------------------------------
 		
