@@ -212,6 +212,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
                         gmm.setIntensityMeasure(imt.imt.name());
 
                         if (imt.imt == IMT.SA) {
+                        	@SuppressWarnings("unchecked")
 //                            gmm.getParameter(PeriodParam.NAME)
 //                                    .setValue(imt.period);
                         
@@ -297,15 +298,16 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
 				
 				                        double assetRiskForRupture = assetValue * riskCalc.compute().getRisk();
 				                        
-//				                        if (assetWriter != null) {	                        						                        		
-//				                        		assetWriter.write(asset.getAssetID(), sourceID, ruptureID, assetRiskForRupture);
-//				                        }
+				                        if (assetWriter != null) {	     
+				                        		//TODO remove int(ID) once AssetID is int
+				                        		assetWriter.write(Integer.parseInt(asset.getAssetID()), sourceID, ruptureID, assetRiskForRupture);
+				                        }
 				                        
-				                        if (assetWriter != null) { 
-				                        	synchronized(assetWriter) { 
-				                        		assetWriter.write(asset.getAssetID(), sourceID, ruptureID, assetRiskForRupture); 
-				                        		} 
-				                        	}
+//				                        if (assetWriter != null) { 
+//				                        	synchronized(assetWriter) { 
+//				                        		assetWriter.write(Integer.parseInt(asset.getAssetID()), sourceID, ruptureID, assetRiskForRupture); 
+//				                        		} 
+//				                        	}
 				                        
 				                        // if the risk is loss, accumulate it over the rupture
 				                        if (riskMetricType == RiskMetricType.EXPECTED_LOSS) {
@@ -336,7 +338,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
                                     DateTimeFormatter.ofPattern("h:mm:ss a");
 
                             System.out.printf(
-                                    "Site/IM %d / %d (%.1f%%) | %.2g sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
+                                    "Site&IM %d / %d (%.1f%%) | %.2g sites/s | Now %s | ETA %s (%.1f hr remaining)%n",
                                     done,
                                     totalSiteImKeys,
                                     100.0 * done / totalSiteImKeys,
@@ -360,26 +362,25 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
         ruptureResults.freeze();
         portfolio.setRuptureResults(ruptureResults);
         
-        portfolio.setConvolutionMode(ConvolutionMode.PER_RUPTURE);
-        
-        if (assetWriter != null) {
-        	assetWriter.close();
-        }
-       
+        portfolio.setConvolutionMode(ConvolutionMode.PER_RUPTURE);      
         
         double elapsedSeconds = (System.nanoTime() - startTime) / 1e9;
 
         if (elapsedSeconds >= 3600) {
-	            System.out.printf("Completed in %.1f hours%n",
+	            System.out.printf("Risk assessment completed in %.1f hours%n",
 	                    elapsedSeconds / 3600.0);
 	        } else if (elapsedSeconds >= 60) {
-	            System.out.printf("Completed in %.1f minutes%n",
+	            System.out.printf("Risk assessment completed in %.1f minutes%n",
 	                    elapsedSeconds / 60.0);
 	        } else {
-	            System.out.printf("Completed in %.1f seconds%n",
+	            System.out.printf("Risk assessment completed in %.1f seconds%n",
 	                    elapsedSeconds);
 	        }
         
+        
+        if (assetWriter != null) {
+        	assetWriter.close();
+        }
         
         return portfolio;
     }

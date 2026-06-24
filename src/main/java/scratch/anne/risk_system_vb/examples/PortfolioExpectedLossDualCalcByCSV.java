@@ -33,10 +33,12 @@ public class PortfolioExpectedLossDualCalcByCSV {
 //	public static Path inputFolder = Path.of("PorterVulns_vs-360");
 	
 	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
-	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio_Riemann");
+//	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio");
+	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\sparse_portfolio");
 	
 //	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
 	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
+//	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE);
 	public static boolean writeHazard = true;
 	public static boolean keepAssetLoss = true;
 	
@@ -80,7 +82,7 @@ public class PortfolioExpectedLossDualCalcByCSV {
         
         Files.deleteIfExists(runFolder.resolve(fileTag + "_asset-risk-per-rup.parquet"));
         AssetRiskForRuptureWriter assetWriter = keepAssetLoss
-        		? new AssetRiskForRuptureWriter(runFolder.resolve(fileTag + "_asset-risk-per-rup.parquet"))
+        		? new AssetRiskForRuptureWriter(runFolder, fileTag + "_asset-risk-per-rup")
         		: null;
 
         
@@ -135,15 +137,16 @@ public class PortfolioExpectedLossDualCalcByCSV {
 	            
 	            riskConvolutionPortfolio = calculator.computeRisk();
 	            riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.FULL_HCURVE);
-	            riskConvolutionPortfolio.exportHazard(hazardJson);
+	            if (writeHazard) { riskConvolutionPortfolio.exportHazard(hazardJson); };
 	            ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
 	            aggregator.writeCSV(fullOutputCSV);
 	            aggregator.writeAggregatedCSV(aggregatedOutputCSV);
 	            
+	            aggregator.printSummary();
 	            System.out.println("Outputs written to run folder:");
 	            System.out.println(fullOutputCSV);
 	            System.out.println(aggregatedOutputCSV);
-	            System.out.println(hazardJson);
+	            if (writeHazard) { System.out.println(hazardJson); };
 
 	        }
 	        else if (convolutionMode == ConvolutionMode.PER_RUPTURE) {
@@ -162,6 +165,8 @@ public class PortfolioExpectedLossDualCalcByCSV {
 	            riskConvolutionPortfolio = calculator.computeRisk();
 	            riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.PER_RUPTURE);
 	            riskConvolutionPortfolio.exportRuptureResults(perRuptureOutputCSV);
+	            
+	            System.out.println("Total Loss: " + riskConvolutionPortfolio.getRuptureResults().getTotalLoss());
 	            
 	            System.out.println("Outputs written to run folder:");
 	            System.out.println(perRuptureOutputCSV);
