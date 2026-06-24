@@ -8,7 +8,6 @@ import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.earthquake.ProbEqkRupture;
 
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
-import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetricType;
 
 public final class RuptureResultsCollection {

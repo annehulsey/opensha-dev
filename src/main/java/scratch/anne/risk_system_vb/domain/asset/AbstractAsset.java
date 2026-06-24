@@ -13,6 +13,7 @@ import java.util.Objects;
  */
 public abstract class AbstractAsset {
 
+	//TODO change assetID to int across project
     protected final String assetID;
     protected final AssetType assetType;
     protected final double lat;

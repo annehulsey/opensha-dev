@@ -3,7 +3,6 @@ package scratch.anne.risk_system_vb.domain.asset.fragility;
 import java.util.*;
 
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset;
-import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
 
 /**
  * Asset pointing to a fragility for the response model.

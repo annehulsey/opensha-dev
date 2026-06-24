@@ -35,6 +35,10 @@ import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvol
 import scratch.anne.risk_system_vb.util.Metadata;
 import scratch.anne.risk_system_vb.util.StringUtil;
 
+
+//TODO clean up PBR gui for updated workflow
+//TODO make a gui based on the standard OpenSHA template
+
 public class PBRAppUI extends JFrame {
 	
     // =========================

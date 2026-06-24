@@ -175,6 +175,7 @@ public class PortfolioRiskConvolutionCalculator {
                         gmm.setIntensityMeasure(imt.imt.name());
 
                         if (imt.imt == IMT.SA) {
+                        	@SuppressWarnings("unchecked")
 //                            gmm.getParameter(PeriodParam.NAME)
 //                                    .setValue(imt.period);
                         
