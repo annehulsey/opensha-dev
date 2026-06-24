@@ -282,14 +282,21 @@ public class RiskConvolution {
             double respDelta = (respRight - respLeft) * invIml;
 
             double ratio = hazRight / hazLeft;
-            double invG = imlDelta / Math.log(ratio);
-
-            double term1 = respLeft * hazLeft * (1.0 - ratio);
-
-            double term2 = respDelta * hazLeft *
-                    (ratio * (imlDelta - invG) + invG);
-
-            double delta = term1 - term2;
+            double delta;
+            
+            if (hazLeft == 0.0) {
+            	// hazard is 0 so risk is 0
+                delta = 0.0;
+            } else if (Math.abs(ratio - 1.0) < 1e-10) {
+            	// hazard is flat so the integral is a rectangular bin
+                delta = hazLeft * (respRight - respLeft);
+            } else {
+            	// log-linear assumption
+                double invG = imlDelta / Math.log(ratio);
+                double term1 = respLeft * hazLeft * (1.0 - ratio);
+                double term2 = respDelta * hazLeft * (ratio * (imlDelta - invG) + invG);
+                delta = term1 - term2;
+            }
 
             contribution[i + 1] = delta;
             risk += delta;
