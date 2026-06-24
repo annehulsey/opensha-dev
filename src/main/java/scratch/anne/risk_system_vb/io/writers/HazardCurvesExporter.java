@@ -50,6 +50,8 @@ public final class HazardCurvesExporter {
         }
     }
 
+ // Fields are accessed by Gson via reflection for JSON serialization
+    @SuppressWarnings("unused")
     private static class HazardJson {
         double lat;
         double lon;

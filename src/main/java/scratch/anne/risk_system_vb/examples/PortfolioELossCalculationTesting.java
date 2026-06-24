@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.VulnerabilityAsset;
@@ -28,8 +27,6 @@ import scratch.anne.risk_system_vb.io.readers.ParseRiskRunParametersCSV;
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.util.IO;
-import scratch.anne.risk_system_vb.util.ImValueTransformer;
-import scratch.anne.risk_system_vb.util.StringUtil;
 
 
 public class PortfolioELossCalculationTesting {
@@ -72,9 +69,6 @@ public class PortfolioELossCalculationTesting {
 
         IO.verifyFileExists(portfolioCSV, "Portfolio CSV");
         IO.verifyFileExists(vulnLibraryJSON, "Vulnerability JSON");
-        
-        String portfolioName = portfolioCSV.getFileName().toString();
-        String vulnName = vulnLibraryJSON.getFileName().toString();
         
         Portfolio<VulnerabilityAsset> basePortfolio =
                 PortfolioReader.readCSV(portfolioCSV, VulnerabilityAsset.class);

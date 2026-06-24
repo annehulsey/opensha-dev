@@ -1,13 +1,10 @@
 package scratch.anne.risk_system_vb.domain.hazard;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.calc.sourceFilters.SourceFilterManager;
-import org.opensha.sha.calc.sourceFilters.SourceFilters;
-import org.opensha.sha.calc.sourceFilters.params.SourceFiltersParam;
 
 /**
  * Immutable metadata describing how a hazard field was generated.

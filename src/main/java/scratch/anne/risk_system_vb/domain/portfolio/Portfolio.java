@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset;
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
-import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
 import scratch.anne.risk_system_vb.util.Metadata;
 import scratch.anne.risk_system_vb.util.PortfolioGroupingUtils;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;

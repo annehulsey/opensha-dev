@@ -5,7 +5,6 @@ import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.asset.AbstractAsset.AssetType;
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricType;
-import scratch.anne.risk_system_vb.domain.asset.fragility.PBRSurvivalAsset;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.util.Metadata;
