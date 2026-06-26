@@ -18,7 +18,7 @@ public final class RuptureResultsCollection {
     
     private final RuptureLossAccumulator accumulator;
     
-    private double totalLoss;
+    private double totalExpectedLoss;
     private Map<RuptureKey, Double> lossContributions;
     private Map<RuptureKey, Double> relativeContributions;
     
@@ -41,7 +41,7 @@ public final class RuptureResultsCollection {
         
         this.accumulator = new RuptureLossAccumulator(ruptureLikelihoods.keySet());
         
-        this.totalLoss = 0.0;
+        this.totalExpectedLoss = 0.0;
         this.lossContributions = new LinkedHashMap<>();
         this.relativeContributions = new LinkedHashMap<>();
         
@@ -76,13 +76,16 @@ public final class RuptureResultsCollection {
     }
     
     
-    public double getTotalLoss() {
+    public double getTotalExpectedLoss() {
     	if (!frozen)
             throw new IllegalStateException(
-                "Total loss not yet computed");
-    	return totalLoss;
+                "Total expected loss not yet computed");
+    	return totalExpectedLoss;
     }
-
+    
+    public int getRuptureCount() {
+        return ruptureLikelihoods.size();
+    }
 
 
     public HazardParameters getHazardParameters() {
@@ -226,7 +229,7 @@ public final class RuptureResultsCollection {
 
         frozen = true;
         
-        totalLoss = computeLossOverAllRuptures();
+        totalExpectedLoss = computeLossOverAllRuptures();
     }
     
     private double computeLossOverAllRuptures() {
@@ -275,6 +278,18 @@ public final class RuptureResultsCollection {
         }
 
         return total;
+    }
+    
+    
+    // ---------------------------------------------------------------------
+    // UTILITIES
+    // ---------------------------------------------------------------------
+    
+    /** Prints a summary of portfolio losses. */
+    public void printSummary() {
+        System.out.println("----- ELossPortfolio Summary -----");
+        System.out.printf("Total ruptures: %d%n", getRuptureCount());
+        System.out.printf("Total expected loss: %.2e%n", getTotalExpectedLoss());
     }
 
 }

@@ -29,18 +29,18 @@ import scratch.anne.risk_system_vb.util.IO;
  */
 public class PortfolioExpectedLossDualCalcByCSV {
 		
-//	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\rate\\porter_vulns");
-//	public static Path inputFolder = Path.of("PorterVulns_vs-360");
+	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\rate\\riemann\\porter_vulns");
+	public static Path inputFolder = Path.of("PorterVulns_vs-360");
 	
-	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
-//	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio");
-	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\sparse_portfolio");
+//	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
+//	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio_Riemann");
+//	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\sparse_portfolio");
 	
-//	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
-	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
+	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
+//	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
 //	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE);
 	public static boolean writeHazard = true;
-	public static boolean keepAssetLoss = true;
+	public static boolean keepAssetLoss = false;
 	
 
     public static void main(String[] args) throws Exception {
@@ -166,7 +166,7 @@ public class PortfolioExpectedLossDualCalcByCSV {
 	            riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.PER_RUPTURE);
 	            riskConvolutionPortfolio.exportRuptureResults(perRuptureOutputCSV);
 	            
-	            System.out.println("Total Loss: " + riskConvolutionPortfolio.getRuptureResults().getTotalLoss());
+	            riskConvolutionPortfolio.getRuptureResults().printSummary();
 	            
 	            System.out.println("Outputs written to run folder:");
 	            System.out.println(perRuptureOutputCSV);

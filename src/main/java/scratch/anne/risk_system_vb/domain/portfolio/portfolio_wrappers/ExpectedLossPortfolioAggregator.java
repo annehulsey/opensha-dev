@@ -363,7 +363,7 @@ public final class ExpectedLossPortfolioAggregator
     // UTILITIES
     // ---------------------------------------------------------------------
     
-    /** Prints a summary of portfolio losses including per-asset detail. */
+    /** Prints a summary of portfolio losses. */
     public void printSummary() {
         System.out.println("----- ELossPortfolio Summary -----");
         System.out.printf("Total assets: %d%n", assets.size());

@@ -156,7 +156,7 @@ public class PortfolioELossCalculationTesting {
             		            riskConvolutionPortfolio.exportRuptureResults(outputCSV);
             		            
             		            RuptureResultsCollection ruptureResults = riskConvolutionPortfolio.getRuptureResults();
-            		            double totalValue = ruptureResults.getTotalLoss();
+            		            double totalValue = ruptureResults.getTotalExpectedLoss();
             		            
             		            String topContributors = ruptureResults.getTopContributors(5).stream()
             		            	    .map(r -> String.format(

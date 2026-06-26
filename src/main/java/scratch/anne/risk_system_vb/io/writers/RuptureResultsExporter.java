@@ -59,7 +59,7 @@ public final class RuptureResultsExporter {
 
             writer.newLine(); // separator
             
-            writeParam(writer, "totalLoss", String.valueOf(collection.getTotalLoss()));
+            writeParam(writer, "totalExpectedLoss", String.valueOf(collection.getTotalExpectedLoss()));
             
             writer.newLine(); // separator
 
