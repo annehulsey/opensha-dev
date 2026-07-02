@@ -78,7 +78,11 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
     ) {
     	this.portfolio = portfolio;
     	this.riskMetricType = portfolio.getRiskMetricType();
-        
+    	
+    	// if not calculating expected loss, the only save results are asset level
+    	if (riskMetricType != RiskMetricType.EXPECTED_LOSS) {
+    		throw new IllegalStateException("Per-rupture probability of failure assessment save asset-level results");
+    	}
         
     	this.responseLib = responseLib;
     	this.hazardParameters = hazardParameters;
@@ -151,46 +155,43 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
     /** hazard and risk calculation loops */
     public RiskConvolutionPortfolio computeRisk() {
     	
-    	ruptureResults = RuptureResultsCollection.fromERF(erf, hazardParameters);
+    	ruptureResults = RuptureResultsCollection.fromERF(erf, hazardParameters);    	
 
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
-
         ScalarIMR baseGmm = gmmRef.get();
-
         List<SiteKey> siteKeys = new ArrayList<>(portfolio.getSiteKeys());
 
         int totalSiteImKeys = countTotalSiteImKeys();
         AtomicInteger counter = new AtomicInteger();
-
         long startTime = System.nanoTime();
         
         System.out.printf(
                 "%nRunning per-rupture loop for %d Site & Im Keys %n",
                 totalSiteImKeys
         );
+        
+        
+        final boolean thresholdedAssetWriter = assetWriter != null
+                && riskMetricType == RiskMetricType.EXPECTED_LOSS;
+        final double totalPortfolioValue = thresholdedAssetWriter
+                ? portfolio.getTotalPortfolioValue()
+                : 0d;        
 
         List<Site> sites = new ArrayList<>();
-
         for (SiteKey siteKey : siteKeys) {
-
             Site site = new Site(new Location(siteKey.getLat(), siteKey.getLon()));
-
             for (Parameter<?> p : baseGmm.getSiteParams())
                 site.addParameter((Parameter<?>) p.clone());
-
             @SuppressWarnings("unchecked")
             Parameter<Double> gmmVs30 =
                     (Parameter<Double>) site.getParameter("Vs30");
-
             gmmVs30.setValue(siteKey.getVs30());
-
             sites.add(site);
         }
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (int i = 0; i < sites.size(); i++) {
-
             final Site site = sites.get(i);
             final SiteKey siteKey = siteKeys.get(i);
 
@@ -199,7 +200,6 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
                 ScalarIMR gmm = null;
 
                 try {
-
                     synchronized (gmmDeque) {
                         gmm = gmmDeque.isEmpty() ? gmmRef.get() : gmmDeque.pop();
                     }
@@ -221,18 +221,14 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
                         	//TODO find better solution for invalid gmm periods
                         	Parameter<Double> p =
                         	    (Parameter<Double>) gmm.getParameter(PeriodParam.NAME);
-
                         	var constraint =
                         	    (org.opensha.commons.param.constraint.impl.DoubleDiscreteConstraint)
                         	        p.getConstraint();
-
                         	double requested = imt.period;
-
                         	double allowed =
                         	    constraint.getAllowedDoubles().stream()
                         	        .min(Comparator.comparing(d -> Math.abs(d - requested)))
                         	        .orElseThrow();
-
                         	p.setValue(allowed);
                         }
 
@@ -280,44 +276,46 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
 		                        for (int j = 0; j < hazard.length; j++)
 		                            hazard[j] = hazFunc.getY(j);
 			                        
-			                        for (RiskConvolutionAsset asset :
-			                            portfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
-	
-			                        	// get asset value, defaults to 1 if not assessing expected loss
-			                        	double assetValue = 1.0;
-										if (riskMetricType == RiskMetricType.EXPECTED_LOSS) {
-											ExpectedLossAsset vulnAsset = (ExpectedLossAsset) asset;
-											assetValue = vulnAsset.getValue();
-										}
-			                        	
-				                        RiskConvolution riskCalc = new RiskConvolution(
-				                                responseLib.getByName(asset.getModelName()),
-				                                hazard,
-				                                integrationMethod
-				                        );
-				
-				                        double assetRiskForRupture = assetValue * riskCalc.compute().getRisk();
-				                        
-				                        if (assetWriter != null) {	     
-				                        		//TODO remove int(ID) once AssetID is int
-				                        		assetWriter.write(Integer.parseInt(asset.getAssetID()), sourceID, ruptureID, assetRiskForRupture);
-				                        }
-				                        
-//				                        if (assetWriter != null) { 
-//				                        	synchronized(assetWriter) { 
-//				                        		assetWriter.write(Integer.parseInt(asset.getAssetID()), sourceID, ruptureID, assetRiskForRupture); 
-//				                        		} 
-//				                        	}
-				                        
-				                        // if the risk is loss, accumulate it over the rupture
-				                        if (riskMetricType == RiskMetricType.EXPECTED_LOSS) {
-				                        	double assetLossForRupture = assetRiskForRupture;
-				                        	ruptureResults.accumulateRuptureLoss(new RuptureKey(sourceID, ruptureID), assetLossForRupture);
-				                        }
-				                        
-				                        
-			                        }
+		                        final double siteImValue = thresholdedAssetWriter
+		                                ? portfolio.getTotalSiteImValue(siteKey, imKey)
+		                                : 0d;
+		                        Map<Integer, Double> assetLosses = thresholdedAssetWriter ? new HashMap<>() : null;
+	                        	
+		                        for (RiskConvolutionAsset asset :
+		                            portfolio.getAssetsBySiteAndImKey(siteKey, imKey)) {
+		                        	
+			                        RiskConvolution riskCalc = new RiskConvolution(
+			                                responseLib.getByName(asset.getModelName()),
+			                                hazard,
+			                                integrationMethod
+			                        );
+			                        
+                                   if (riskMetricType == RiskMetricType.EXPECTED_LOSS) {
+                                        ExpectedLossAsset vulnAsset = (ExpectedLossAsset) asset;
+                                        double assetLossForRupture = vulnAsset.getValue() * riskCalc.compute().getRisk();
+                                        ruptureResults.accumulateRuptureLoss(new RuptureKey(sourceID, ruptureID), assetLossForRupture);
+                                        if (thresholdedAssetWriter) {
+                                        	//TODO remove Int conversion once getAssetID type is fixed
+                                            assetLosses.put(Integer.parseInt(asset.getAssetID()), assetLossForRupture);
+                                        }
+                                    } else {
+                                        // not expected loss — always write, no threshold
+                                    	//TODO remove Int conversion once getAssetID type is fixed
+                                        assetWriter.write(Integer.parseInt(asset.getAssetID()), sourceID, ruptureID, riskCalc.compute().getRisk());
+                                    }
+                                }
+
+		                        if (thresholdedAssetWriter) {
+		                            double siteImLoss = assetLosses.values().stream()
+		                                    .mapToDouble(Double::doubleValue).sum();
+		                            double threshold = assetWriter.writeThresholdValue(siteImValue, totalPortfolioValue);
+		                            if (siteImLoss >= threshold) {
+		                                for (Map.Entry<Integer, Double> entry : assetLosses.entrySet()) {
+		                                    assetWriter.write(entry.getKey(), sourceID, ruptureID, entry.getValue());
+		                                }
+		                            }
 		                        }
+	                        }
                         }
 
                         // ----- PROGRESS -----

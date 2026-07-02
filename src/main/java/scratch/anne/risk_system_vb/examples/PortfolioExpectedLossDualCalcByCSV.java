@@ -19,6 +19,7 @@ import scratch.anne.risk_system_vb.io.readers.ParseRiskRunParametersCSV;
 import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
 import scratch.anne.risk_system_vb.io.writers.AssetRiskForRuptureWriter;
+import scratch.anne.risk_system_vb.io.writers.FileFormat;
 import scratch.anne.risk_system_vb.util.ImValueTransformer;
 import scratch.anne.risk_system_vb.util.StringUtil;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
@@ -29,18 +30,22 @@ import scratch.anne.risk_system_vb.util.IO;
  */
 public class PortfolioExpectedLossDualCalcByCSV {
 		
-	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\rate\\riemann\\porter_vulns");
-	public static Path inputFolder = Path.of("PorterVulns_vs-360");
+//	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\rate\\riemann\\porter_vulns");
+//	public static Path inputFolder = Path.of("PorterVulns_vs-360");
 	
-//	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
-//	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio_Riemann");
+	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
+	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio");
 //	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\sparse_portfolio");
 	
-	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
-//	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
+//	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
+	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
 //	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE);
+	
 	public static boolean writeHazard = true;
-	public static boolean keepAssetLoss = false;
+	
+	public static boolean keepAssetLoss = true;
+	public static double fRelative = 0d;
+	public static double fAbsolute = 0d;
 	
 
     public static void main(String[] args) throws Exception {
@@ -80,9 +85,8 @@ public class PortfolioExpectedLossDualCalcByCSV {
                 ? runFolder.resolve(fileTag + "_hazard-list.json")
                 : null;
         
-        Files.deleteIfExists(runFolder.resolve(fileTag + "_asset-risk-per-rup.parquet"));
         AssetRiskForRuptureWriter assetWriter = keepAssetLoss
-        		? new AssetRiskForRuptureWriter(runFolder, fileTag + "_asset-risk-per-rup")
+        		? new AssetRiskForRuptureWriter(runFolder, fileTag + "_asset-risk-per-rup",fRelative,fAbsolute)
         		: null;
 
         
@@ -165,6 +169,7 @@ public class PortfolioExpectedLossDualCalcByCSV {
 	            riskConvolutionPortfolio = calculator.computeRisk();
 	            riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.PER_RUPTURE);
 	            riskConvolutionPortfolio.exportRuptureResults(perRuptureOutputCSV);
+//	            riskConvolutionPortfolio.exportRuptureResults(perRuptureOutputPARQUET,FileFormat.PARQUET);
 	            
 	            riskConvolutionPortfolio.getRuptureResults().printSummary();
 	            

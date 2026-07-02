@@ -20,6 +20,15 @@ import org.apache.parquet.io.OutputFile;
 
 public final class AssetRiskForRuptureWriter implements AutoCloseable {
 
+    /** Fraction of site&IM asset value — write if loss exceeds this proportion of local exposure */
+    public static final double DEFAULT_F_RELATIVE = 0.01;
+
+    /** Fraction of total portfolio value — write if loss exceeds this proportion of portfolio */
+    public static final double DEFAULT_F_ABSOLUTE = 1e-7;
+
+    private final double fRelative;
+    private final double fAbsolute;
+
     private final Schema schema = new Schema.Parser().parse("""
             {
               "type": "record",
@@ -39,12 +48,17 @@ public final class AssetRiskForRuptureWriter implements AutoCloseable {
             new ConcurrentHashMap<>();
 
     private final Path parquetDir;
-    
+
     private final AtomicInteger threadCounter = new AtomicInteger(0);
     private final ConcurrentHashMap<Long, Integer> threadIndex = new ConcurrentHashMap<>();
 
-    public AssetRiskForRuptureWriter(Path outputDir, String fileTag) throws IOException {
+    /** Full constructor */
+    public AssetRiskForRuptureWriter(Path outputDir, String fileTag,
+                                     double fRelative, double fAbsolute) throws IOException {
+        this.fRelative = fRelative;
+        this.fAbsolute = fAbsolute;
         this.parquetDir = outputDir.resolve(fileTag);
+
         if (Files.exists(parquetDir)) {
             try (var stream = Files.walk(parquetDir)) {
                 stream.sorted(Comparator.reverseOrder())
@@ -55,7 +69,6 @@ public final class AssetRiskForRuptureWriter implements AutoCloseable {
                           }
                       });
             }
-            // check if anything remains
             try (var remaining = Files.list(parquetDir)) {
                 List<Path> leftover = remaining.toList();
                 if (!leftover.isEmpty()) {
@@ -68,6 +81,21 @@ public final class AssetRiskForRuptureWriter implements AutoCloseable {
         Files.createDirectories(parquetDir);
     }
 
+    /** Default thresholds */
+    public AssetRiskForRuptureWriter(Path outputDir, String fileTag) throws IOException {
+        this(outputDir, fileTag, DEFAULT_F_RELATIVE, DEFAULT_F_ABSOLUTE);
+    }
+
+    /**
+     * Returns the write threshold for a given site&IM loss context.
+     * Write if siteImLoss exceeds this value.
+     */
+    public double writeThresholdValue(double siteImAssetValue, double totalPortfolioValue) {
+        return Math.min(fRelative * siteImAssetValue, fAbsolute * totalPortfolioValue);
+    }
+
+    public double getFRelative() { return fRelative; }
+    public double getFAbsolute() { return fAbsolute; }
 
     private ParquetWriter<GenericRecord> writerForThread() {
         long tid = Thread.currentThread().threadId();
@@ -75,7 +103,6 @@ public final class AssetRiskForRuptureWriter implements AutoCloseable {
         return threadWriters.computeIfAbsent(tid, id -> {
             try {
                 Path file = parquetDir.resolve(String.format("part-%05d.parquet", idx));
-
                 OutputFile out = new LocalOutputFile(file.toAbsolutePath().normalize());
                 return AvroParquetWriter.<GenericRecord>builder(out)
                         .withSchema(schema)
