@@ -479,4 +479,57 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
             }
         }
     }
+    
+    
+    // ---------------------------------------------------------------------
+    // Asset value queries (EXPECTED_LOSS portfolios only)
+    // ---------------------------------------------------------------------
+    
+    /**
+     * Total value of all assets in the portfolio.
+     *
+     * @throws IllegalStateException if this is not an EXPECTED_LOSS portfolio
+     */
+    public double getTotalPortfolioValue() {
+        requireExpectedLoss("getTotalPortfolioValue()");
+        return assets.stream()
+                .mapToDouble(a -> ((ExpectedLossAsset) a).getValue())
+                .sum();
+    }
+
+    /**
+     * Total value of all assets at the given site, across all IMs.
+     *
+     * @throws IllegalStateException if this is not an EXPECTED_LOSS portfolio
+     */
+    public double getTotalSiteValue(SiteKey siteKey) {
+        requireExpectedLoss("getTotalAssetValue(SiteKey)");
+        return assetsBySite.getOrDefault(siteKey, List.of())
+                .stream()
+                .mapToDouble(a -> ((ExpectedLossAsset) a).getValue())
+                .sum();
+    }
+
+    /**
+     * Total value of assets at the given site sensitive to the given IM.
+     *
+     * @throws IllegalStateException if this is not an EXPECTED_LOSS portfolio
+     */
+    public double getTotalSiteImValue(SiteKey siteKey, ImKey imKey) {
+        requireExpectedLoss("getTotalAssetValue(SiteKey, ImKey)");
+        return assetsBySiteAndImKey
+                .getOrDefault(siteKey, Map.of())
+                .getOrDefault(imKey, List.of())
+                .stream()
+                .mapToDouble(a -> ((ExpectedLossAsset) a).getValue())
+                .sum();
+    }
+
+    private void requireExpectedLoss(String method) {
+        if (riskMetricType != RiskMetricType.EXPECTED_LOSS) {
+            throw new IllegalStateException(
+                method + " is only valid for EXPECTED_LOSS portfolios, but this portfolio is "
+                + riskMetricType);
+        }
+    }
 }
