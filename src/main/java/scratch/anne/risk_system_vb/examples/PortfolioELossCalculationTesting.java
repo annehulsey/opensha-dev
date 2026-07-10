@@ -19,8 +19,8 @@ import scratch.anne.risk_system_vb.domain.structural_response.ResponseModelLibra
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution.IntegrationMethod;
+import scratch.anne.risk_system_vb.engine.per_rupture.RuptureLossResultsCollection;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioPerRuptureRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.io.readers.ParseRiskRunParametersCSV;
@@ -155,7 +155,7 @@ public class PortfolioELossCalculationTesting {
             		            riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.PER_RUPTURE);
             		            riskConvolutionPortfolio.exportRuptureResults(outputCSV);
             		            
-            		            RuptureResultsCollection ruptureResults = riskConvolutionPortfolio.getRuptureResults();
+            		            RuptureLossResultsCollection ruptureResults = riskConvolutionPortfolio.getRuptureResults();
             		            double totalValue = ruptureResults.getTotalExpectedLoss();
             		            
             		            String topContributors = ruptureResults.getTopContributors(5).stream()

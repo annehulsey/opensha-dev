@@ -1,8 +1,10 @@
-package scratch.anne.risk_system_vb.engine.accumulators;
+package scratch.anne.risk_system_vb.engine.per_rupture;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.DoubleAdder;
+
+import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
 
 /**
  * Thread-safe accumulator for rupture-level losses.

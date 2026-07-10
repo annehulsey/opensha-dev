@@ -1,4 +1,4 @@
-package scratch.anne.risk_system_vb.engine.accumulators;
+package scratch.anne.risk_system_vb.engine.per_rupture;
 
 public record AssetRiskForRupture(
 	    String assetId,

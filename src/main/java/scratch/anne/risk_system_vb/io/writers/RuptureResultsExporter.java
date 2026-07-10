@@ -11,8 +11,8 @@ import org.apache.parquet.io.LocalOutputFile;
 import org.apache.parquet.io.OutputFile;
 
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection.RuptureResult;
+import scratch.anne.risk_system_vb.engine.per_rupture.RuptureLossResultsCollection;
+import scratch.anne.risk_system_vb.engine.per_rupture.RuptureLossResultsCollection.RuptureResult;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -42,7 +42,7 @@ public final class RuptureResultsExporter {
     // ------------------------------------------------------------
     // PUBLIC ENTRY
     // ------------------------------------------------------------
-    public void export(RuptureResultsCollection collection,
+    public void export(RuptureLossResultsCollection collection,
                        Path file,
                        FileFormat format) {
         switch (format) {
@@ -55,7 +55,7 @@ public final class RuptureResultsExporter {
     // ------------------------------------------------------------
     // PARQUET EXPORT
     // ------------------------------------------------------------
-    private void exportParquet(RuptureResultsCollection collection, Path file) {
+    private void exportParquet(RuptureLossResultsCollection collection, Path file) {
         HazardParameters hp = collection.getHazardParameters();
 
         // Build metadata map — same fields as the CSV header block
@@ -101,7 +101,7 @@ public final class RuptureResultsExporter {
     // ------------------------------------------------------------
     // CSV EXPORT (unchanged)
     // ------------------------------------------------------------
-    private void exportCsv(RuptureResultsCollection collection, Path file) {
+    private void exportCsv(RuptureLossResultsCollection collection, Path file) {
         HazardParameters hazardParameters = collection.getHazardParameters();
         Map<String, String> filterConfig = hazardParameters.getFilterConfig();
 

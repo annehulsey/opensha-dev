@@ -28,12 +28,12 @@ import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricType;
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
+import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureKey;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
+import scratch.anne.risk_system_vb.engine.per_rupture.RuptureLossResultsCollection;
 import scratch.anne.risk_system_vb.io.writers.AssetRiskForRuptureWriter;
 import scratch.anne.risk_system_vb.util.AssetKeys.SiteKey;
 import scratch.anne.risk_system_vb.util.AssetKeys.ImKey;
@@ -65,7 +65,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
     private final SourceFilterManager filterManager;
     private final List<SourceFilter> sourceFilters;
 
-    RuptureResultsCollection ruptureResults;
+    RuptureLossResultsCollection ruptureResults;
     private final AssetRiskForRuptureWriter assetWriter;
 
     /** full constructor */
@@ -155,7 +155,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
     /** hazard and risk calculation loops */
     public RiskConvolutionPortfolio computeRisk() {
     	
-    	ruptureResults = RuptureResultsCollection.fromERF(erf, hazardParameters);    	
+    	ruptureResults = RuptureLossResultsCollection.fromERF(erf, hazardParameters);    	
 
         ArrayDeque<ScalarIMR> gmmDeque = new ArrayDeque<>();
         ScalarIMR baseGmm = gmmRef.get();

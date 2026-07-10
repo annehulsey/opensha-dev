@@ -11,7 +11,7 @@ import org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_WUS_BranchAv
 import scratch.UCERF3.erf.mean.MeanUCERF3;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetric;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
+import scratch.anne.risk_system_vb.engine.per_rupture.RuptureLossResultsCollection;
 import scratch.anne.risk_system_vb.io.writers.FileFormat;
 import scratch.anne.risk_system_vb.io.writers.RuptureResultsExporter;
 
@@ -97,8 +97,8 @@ public class ExploreERF {
                 // -----------------------------
                 // build + export
                 // -----------------------------
-                RuptureResultsCollection results =
-                        RuptureResultsCollection.fromERF(erf, params);
+                RuptureLossResultsCollection results =
+                        RuptureLossResultsCollection.fromERF(erf, params);
 
                 RuptureResultsExporter exporter = new RuptureResultsExporter();
                 exporter.export(results, outputCsv, FileFormat.CSV);
