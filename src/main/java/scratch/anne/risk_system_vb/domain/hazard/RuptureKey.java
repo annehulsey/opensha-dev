@@ -1,4 +1,4 @@
-package scratch.anne.risk_system_vb.engine.accumulators;
+package scratch.anne.risk_system_vb.domain.hazard;
 
 /**
  * Unique identifier for a rupture within a source.

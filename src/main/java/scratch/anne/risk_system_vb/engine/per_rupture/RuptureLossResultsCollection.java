@@ -1,4 +1,4 @@
-package scratch.anne.risk_system_vb.engine.accumulators;
+package scratch.anne.risk_system_vb.engine.per_rupture;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -8,9 +8,10 @@ import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.earthquake.ProbEqkRupture;
 
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
+import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters.HazardMetricType;
 
-public final class RuptureResultsCollection {
+public final class RuptureLossResultsCollection {
 
     private final HazardParameters hazardParameters;
 
@@ -24,7 +25,7 @@ public final class RuptureResultsCollection {
     
     private boolean frozen;
 
-    public RuptureResultsCollection(
+    public RuptureLossResultsCollection(
             HazardParameters hazardParameters,
             Map<RuptureKey, Double> ruptureLikelihoods
     ) {
@@ -170,7 +171,7 @@ public final class RuptureResultsCollection {
      * <p>The supplied ERF must have already had
      * {@code updateForecast()} called.</p>
      */
-    public static RuptureResultsCollection fromERF(
+    public static RuptureLossResultsCollection fromERF(
             AbstractERF erf,
             HazardParameters hazardParameters
     ) {
@@ -215,7 +216,7 @@ public final class RuptureResultsCollection {
             }
         }
 
-        return new RuptureResultsCollection(
+        return new RuptureLossResultsCollection(
                 hazardParameters,
                 ruptureLikelihoods
         );

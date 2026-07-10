@@ -15,7 +15,7 @@ import scratch.anne.risk_system_vb.domain.portfolio.Portfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.PortfolioGetters;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponse;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
+import scratch.anne.risk_system_vb.engine.per_rupture.RuptureLossResultsCollection;
 import scratch.anne.risk_system_vb.io.writers.FileFormat;
 import scratch.anne.risk_system_vb.io.writers.HazardCurvesExporter;
 import scratch.anne.risk_system_vb.io.writers.RuptureResultsExporter;
@@ -81,7 +81,7 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
 	 // Rupture results (used when ConvolutionMode.PER_RUPTURE)
 	 // ---------------------------------------------------------------------
 	
-   private RuptureResultsCollection ruptureResults;
+   private RuptureLossResultsCollection ruptureResults;
 
     // ---------------------------------------------------------------------
     // Construction
@@ -444,12 +444,12 @@ public final class RiskConvolutionPortfolio implements PortfolioGetters<RiskConv
     }
     
     // ----- rupture results storage helpers ---------   
-    public void setRuptureResults(RuptureResultsCollection ruptureResults) {
+    public void setRuptureResults(RuptureLossResultsCollection ruptureResults) {
         this.ruptureResults = ruptureResults;
     }
     
     
-    public RuptureResultsCollection getRuptureResults() {
+    public RuptureLossResultsCollection getRuptureResults() {
         return ruptureResults;
     }
     

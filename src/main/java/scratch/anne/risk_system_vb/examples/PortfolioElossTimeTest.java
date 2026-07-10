@@ -14,9 +14,9 @@ import scratch.anne.risk_system_vb.domain.structural_response.ResponseModelLibra
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
 import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.SimpleImVulnLibraryPreparer;
 import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.VulnerabilityModel;
-import scratch.anne.risk_system_vb.engine.accumulators.RuptureResultsCollection;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution.IntegrationMethod;
+import scratch.anne.risk_system_vb.engine.per_rupture.RuptureLossResultsCollection;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioPerRuptureRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
 import scratch.anne.risk_system_vb.io.readers.ParseRiskRunParametersCSV;
@@ -31,7 +31,7 @@ import scratch.anne.risk_system_vb.util.StringUtil;
 public class PortfolioElossTimeTest {
 
     public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
-    public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio");
+    public static Path inputFolder = Path.of("tests\\time-tests\\short_portfolio");
 
     public static boolean writeHazard = false;
     public static double fRelative = 0d;
