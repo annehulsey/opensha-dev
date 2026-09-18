@@ -39,6 +39,12 @@ public final class RuptureResultsExporter {
             }
             """);
 
+    // Prefixes so erfConfig / filterConfig keys can't collide with each
+    // other or with the fixed fields (erfName, gmmName, etc.) when both
+    // are flattened into the same metadata map/CSV header block.
+    private static final String ERF_CONFIG_PREFIX = "erfConfig.";
+    private static final String FILTER_CONFIG_PREFIX = "filterConfig.";
+
     // ------------------------------------------------------------
     // PUBLIC ENTRY
     // ------------------------------------------------------------
@@ -53,23 +59,54 @@ public final class RuptureResultsExporter {
     }
 
     // ------------------------------------------------------------
-    // PARQUET EXPORT
+    // Shared: builds the full reproducibility metadata map
     // ------------------------------------------------------------
-    private void exportParquet(RuptureLossResultsCollection collection, Path file) {
-        HazardParameters hp = collection.getHazardParameters();
+    private Map<String, String> buildMetadata(HazardParameters hp, double totalExpectedLoss) {
 
-        // Build metadata map — same fields as the CSV header block
         Map<String, String> meta = new HashMap<>();
         meta.put("erfName",           hp.getErfName());
         meta.put("erfDuration",       String.valueOf(hp.getErfDuration()));
         meta.put("hazardMetric",      hp.getHazardMetric().name());
         meta.put("gmmName",           hp.getGmmName());
-        meta.put("totalExpectedLoss", String.valueOf(collection.getTotalExpectedLoss()));
+        meta.put("totalExpectedLoss", String.valueOf(totalExpectedLoss));
+
+        // solutionFile: null means the self-constructing route was used
+        // (erfName built its own solution internally). Recorded
+        // explicitly as an empty string rather than omitted, so the
+        // absence itself is unambiguous on read-back rather than looking
+        // like a missing/forgotten field.
+        Path solutionFile = hp.getSolutionFile();
+        meta.put("solutionFile", solutionFile == null ? "" : solutionFile.toString());
+
+        // erfConfig: the construction-time parameters (useRupMFDs,
+        // includeBackground, griddedSurfaceType, griddedFiniteNumSurfaces,
+        // etc. -- see ErfBuilder) needed to reproduce this exact ERF.
+        // Prefixed so these keys can't collide with filterConfig entries
+        // or the fixed fields above.
+        Map<String, String> erfConfig = hp.getErfConfig();
+        if (erfConfig != null) {
+            for (Map.Entry<String, String> e : erfConfig.entrySet()) {
+                meta.put(ERF_CONFIG_PREFIX + e.getKey(), e.getValue());
+            }
+        }
 
         Map<String, String> filterConfig = hp.getFilterConfig();
         if (filterConfig != null) {
-            meta.putAll(filterConfig);
+            for (Map.Entry<String, String> e : filterConfig.entrySet()) {
+                meta.put(FILTER_CONFIG_PREFIX + e.getKey(), e.getValue());
+            }
         }
+
+        return meta;
+    }
+
+    // ------------------------------------------------------------
+    // PARQUET EXPORT
+    // ------------------------------------------------------------
+    private void exportParquet(RuptureLossResultsCollection collection, Path file) {
+        HazardParameters hp = collection.getHazardParameters();
+
+        Map<String, String> meta = buildMetadata(hp, collection.getTotalExpectedLoss());
 
         OutputFile out = new LocalOutputFile(file.toAbsolutePath().normalize());
 
@@ -99,26 +136,36 @@ public final class RuptureResultsExporter {
     }
 
     // ------------------------------------------------------------
-    // CSV EXPORT (unchanged)
+    // CSV EXPORT
     // ------------------------------------------------------------
     private void exportCsv(RuptureLossResultsCollection collection, Path file) {
         HazardParameters hazardParameters = collection.getHazardParameters();
-        Map<String, String> filterConfig = hazardParameters.getFilterConfig();
+
+        Map<String, String> meta = buildMetadata(hazardParameters, collection.getTotalExpectedLoss());
+        // totalExpectedLoss is written separately below, in its own
+        // blank-line-delimited block, matching the original file's
+        // layout -- pull it out here so it isn't double-written above.
+        String totalExpectedLossStr = meta.remove("totalExpectedLoss");
 
         try (BufferedWriter writer = Files.newBufferedWriter(file)) {
             writer.write("# HazardParameters");
             writer.newLine();
-            writeParam(writer, "erfName",     hazardParameters.getErfName());
-            writeParam(writer, "erfDuration", String.valueOf(hazardParameters.getErfDuration()));
-            writeParam(writer, "hazardMetric", hazardParameters.getHazardMetric().name());
-            writeParam(writer, "gmmName",     hazardParameters.getGmmName());
-            if (filterConfig != null) {
-                for (Map.Entry<String, String> e : filterConfig.entrySet()) {
-                    writeParam(writer, e.getKey(), e.getValue());
-                }
+
+            // Fixed fields first, in a stable order.
+            writeParam(writer, "erfName",      meta.remove("erfName"));
+            writeParam(writer, "erfDuration",  meta.remove("erfDuration"));
+            writeParam(writer, "hazardMetric", meta.remove("hazardMetric"));
+            writeParam(writer, "gmmName",      meta.remove("gmmName"));
+            writeParam(writer, "solutionFile", meta.remove("solutionFile"));
+
+            // Remaining entries: erfConfig.* and filterConfig.* (order
+            // not guaranteed, same as the original filterConfig loop).
+            for (Map.Entry<String, String> e : meta.entrySet()) {
+                writeParam(writer, e.getKey(), e.getValue());
             }
+
             writer.newLine();
-            writeParam(writer, "totalExpectedLoss", String.valueOf(collection.getTotalExpectedLoss()));
+            writeParam(writer, "totalExpectedLoss", totalExpectedLossStr);
             writer.newLine();
 
             writer.write("sourceId,ruptureId,likelihood,ruptureLoss,lossContribution,relativeContribution");

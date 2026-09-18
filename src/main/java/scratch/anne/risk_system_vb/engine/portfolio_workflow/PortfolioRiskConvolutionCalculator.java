@@ -20,9 +20,11 @@ import org.opensha.sha.imr.ScalarIMR;
 import org.opensha.sha.imr.param.IntensityMeasureParams.PeriodParam;
 
 import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset;
+import scratch.anne.risk_system_vb.domain.hazard.ErfBuilder;
 import scratch.anne.risk_system_vb.domain.hazard.HazardCurve;
 import scratch.anne.risk_system_vb.domain.hazard.HazardCurveCollection;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
+import scratch.anne.risk_system_vb.domain.hazard.ErfBuilder;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
@@ -68,26 +70,10 @@ public class PortfolioRiskConvolutionCalculator {
         this.hazardParameters = hazardParameters;
         this.integrationMethod = integrationMethod;
                 
-        try {
-            this.erf = (AbstractERF)
-                    Class.forName(hazardParameters.getErfName())
-                            .getDeclaredConstructor()
-                            .newInstance();
-        } catch (ClassNotFoundException |
-                 NoSuchMethodException |
-                 IllegalAccessException |
-                 InstantiationException |
-                 InvocationTargetException e) {
+       
+    	this.erf = ErfBuilder.build(hazardParameters);
 
-            throw new IllegalArgumentException(
-                    "Failed to instantiate ERF class: " + hazardParameters.getErfName(), e
-            );
-        }
-        
-        this.filterManager = hazardParameters.buildSourceManager();  
-        
-        this.erf.getTimeSpan().setDuration(hazardParameters.getErfDuration());
-        this.erf.updateForecast();
+    	this.filterManager = hazardParameters.buildSourceManager();
       
         this.gmmRef = AttenRelRef.valueOf(hazardParameters.getGmmName().toUpperCase());
     }

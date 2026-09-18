@@ -33,9 +33,12 @@ public class PortfolioExpectedLossDualCalcByCSV {
 //	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\rate\\riemann\\porter_vulns");
 //	public static Path inputFolder = Path.of("PorterVulns_vs-360");
 	
-	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
-	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio");
+//	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
+//	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\short_portfolio");
 //	public static Path inputFolder = Path.of("tests\\asset-per-rupture\\sparse_portfolio");
+	
+	public static Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\true_mean_solution");
+	public static Path inputFolder = Path.of("RES1-W1-MC_Porter-vuln_vs-360");
 	
 //	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.FULL_HCURVE,ConvolutionMode.PER_RUPTURE);
 	public static List<ConvolutionMode> convolutionModes = List.of(ConvolutionMode.PER_RUPTURE);
@@ -43,7 +46,7 @@ public class PortfolioExpectedLossDualCalcByCSV {
 	
 	public static boolean writeHazard = true;
 	
-	public static boolean keepAssetLoss = true;
+	public static boolean keepAssetLoss = false;
 	public static double fRelative = 0d;
 	public static double fAbsolute = 0d;
 	
@@ -69,6 +72,19 @@ public class PortfolioExpectedLossDualCalcByCSV {
         Map<String, String> filterConfig =
                 ParseRiskRunParametersCSV.extractSourceFilterConfig(config);
 
+        // erf_config.csv is optional -- returns ErfConfig.EMPTY if absent,
+        // meaning the ERF self-constructs from input.csv's erf_class with
+        // no extra parameters, exactly as before this file existed.
+        ParseRiskRunParametersCSV.ErfConfig erfConfig =
+                ParseRiskRunParametersCSV.loadErfConfig(runFolder, config);
+
+        if (erfConfig.usesSolutionFile()) {
+            System.out.println("erf_config.csv found with solutionFile set -- using solution-file "
+                    + "route. input.csv's erf_class ('" + config.get("erf_class")
+                    + "') will be IGNORED; erf_config.csv's erfClass ('" + erfConfig.erfClass()
+                    + "') governs construction instead.");
+        }
+
         // ------------------- 1. Resolve input files -------------------
         Path portfolioCSV = Path.of(config.get("portfolio_csv"));
         Path vulnLibraryJSON = Path.of(config.get("vuln_library_json"));
@@ -78,29 +94,21 @@ public class PortfolioExpectedLossDualCalcByCSV {
 
         // ------------------- 2. create output paths inside run folder -------------------
         String fileTag = config.getOrDefault("file_tag", runFolder.getFileName().toString());
-        Path fullOutputCSV = runFolder.resolve(fileTag + "_all-assets.csv");
-        Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated.csv");
-        Path perRuptureOutputCSV = runFolder.resolve(fileTag + "_per-rup.csv");
+        Path fullOutputCSV = runFolder.resolve(fileTag + "_eal-all-assets.csv");
+        Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated-eal.csv");
+        Path perRuptureOutputCSV = runFolder.resolve(fileTag + "_eal-per-rup.csv");
         Path hazardJson = writeHazard
                 ? runFolder.resolve(fileTag + "_hazard-list.json")
                 : null;
         
         AssetRiskForRuptureWriter assetWriter = keepAssetLoss
-        		? new AssetRiskForRuptureWriter(runFolder, fileTag + "_asset-risk-per-rup",fRelative,fAbsolute)
+        		? new AssetRiskForRuptureWriter(runFolder, fileTag + "_asset-eal-per-rup",fRelative,fAbsolute)
         		: null;
 
         
         // ------------------- 3. prepare hazard and integration parameters ----------------
-        HazardParameters hazardParameters = new HazardParameters(
-                config.get("erf_class"),
-                StringUtil.parseDoubleOrDefault(
-                        config.get("erf_duration"),
-                        1.0
-                ),
-                ParseRiskRunParametersCSV.parseHazardMetric(config.get("hazard_metric")),
-                config.get("gmm"),
-                filterConfig
-        );
+        HazardParameters hazardParameters =
+                ParseRiskRunParametersCSV.buildHazardParameters(config, erfConfig);
         
         RiskConvolution.IntegrationMethod integrationMethod = ParseRiskRunParametersCSV.parseIntegrationMethod(config.get("integration_method"));
         double logImStep = StringUtil.parseDoubleOrDefault(config.get("log_im_step"), Double.NaN);
@@ -169,7 +177,6 @@ public class PortfolioExpectedLossDualCalcByCSV {
 	            riskConvolutionPortfolio = calculator.computeRisk();
 	            riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.PER_RUPTURE);
 	            riskConvolutionPortfolio.exportRuptureResults(perRuptureOutputCSV);
-//	            riskConvolutionPortfolio.exportRuptureResults(perRuptureOutputPARQUET,FileFormat.PARQUET);
 	            
 	            riskConvolutionPortfolio.getRuptureResults().printSummary();
 	            

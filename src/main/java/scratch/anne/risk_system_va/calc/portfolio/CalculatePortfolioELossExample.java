@@ -12,7 +12,7 @@ import org.opensha.commons.param.Parameter;
 import org.opensha.commons.data.function.DiscretizedFunc;
 import org.opensha.commons.data.function.ArbitrarilyDiscretizedFunc;
 import org.opensha.sha.calc.HazardCurveCalculator;
-import org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_WUS_BranchAveragedERF;
+import org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_BranchAveragedERF;
 import org.opensha.sha.imr.AttenRelRef;
 import org.opensha.sha.imr.ScalarIMR;
 
@@ -77,7 +77,7 @@ public class CalculatePortfolioELossExample {
         // -------------------------
         // 3) Initialize ERF
         // -------------------------
-        NSHM23_WUS_BranchAveragedERF erf = new NSHM23_WUS_BranchAveragedERF();
+        NSHM23_BranchAveragedERF erf = new NSHM23_BranchAveragedERF();
         erf.getTimeSpan().setDuration(1.0);
         erf.updateForecast();
 

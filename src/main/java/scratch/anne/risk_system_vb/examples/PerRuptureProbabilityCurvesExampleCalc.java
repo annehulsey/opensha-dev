@@ -59,8 +59,15 @@ public class PerRuptureProbabilityCurvesExampleCalc {
         String fileTag = config.getOrDefault("file_tag", runFolder.getFileName().toString());
 
         // ------------------- 3. hazard parameters -------------------
+        
+        // erf_config.csv is optional -- returns ErfConfig.EMPTY if absent,
+        // meaning the ERF self-constructs from input.csv's erf_class with
+        // no extra parameters, exactly as before this file existed.
+        ParseRiskRunParametersCSV.ErfConfig erfConfig =
+                ParseRiskRunParametersCSV.loadErfConfig(runFolder, config);
+        
         HazardParameters hazardParameters =
-                ParseRiskRunParametersCSV.buildHazardParameters(config);
+                ParseRiskRunParametersCSV.buildHazardParameters(config, erfConfig);
 
         // ------------------- 4. IM grid -------------------
         double[] imGrid = NumericUtil.distributeLogSpacedValues(imMin, imMax, logImStep);

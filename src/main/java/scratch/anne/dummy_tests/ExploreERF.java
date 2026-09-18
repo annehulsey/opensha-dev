@@ -6,7 +6,7 @@ import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.earthquake.param.ProbabilityModelOptions;
 import org.opensha.sha.earthquake.param.ProbabilityModelParam;
 import org.opensha.sha.earthquake.rupForecastImpl.WGCEP_UCERF_2_Final.UCERF2;
-import org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_WUS_BranchAveragedERF;
+import org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_BranchAveragedERF;
 
 import scratch.UCERF3.erf.mean.MeanUCERF3;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
@@ -20,7 +20,7 @@ public class ExploreERF {
 	public static void main(String[] args) throws Exception {
 
 		String erfClassName = 
-				"org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_WUS_BranchAveragedERF";
+				"org.opensha.sha.earthquake.rupForecastImpl.nshm23.erf.NSHM23_BranchAveragedERF";
 //				"org.opensha.sha.earthquake.rupForecastImpl.WGCEP_UCERF_2_Final.UCERF2";
 //				"scratch.UCERF3.erf.mean.MeanUCERF3";
 
@@ -88,10 +88,10 @@ public class ExploreERF {
                 // -----------------------------
                 HazardParameters params =
                         new HazardParameters(
-                                erf.getName(),
+                                erf.getClass().getName(),
                                 erf.getTimeSpan().getDuration(),
                                 metric,
-                                "placeholder GMM name"
+                                "ASK_2014"
                         );
 
                 // -----------------------------
@@ -126,7 +126,7 @@ public class ExploreERF {
             );
         }
 
-        else if (erf instanceof NSHM23_WUS_BranchAveragedERF) {
+        else if (erf instanceof NSHM23_BranchAveragedERF) {
             // no-op
         }
     }

@@ -29,6 +29,7 @@ import scratch.anne.risk_system_vb.domain.asset.RiskConvolutionAsset.RiskMetricT
 import scratch.anne.risk_system_vb.domain.asset.vulnerability.ExpectedLossAsset;
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
 import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
+import scratch.anne.risk_system_vb.domain.hazard.ErfBuilder;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio;
 import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 import scratch.anne.risk_system_vb.domain.structural_response.SimpleImResponseLibrary;
@@ -88,28 +89,12 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
     	this.hazardParameters = hazardParameters;
     	this.integrationMethod = integrationMethod;
                 
-    	SurfaceCachingPolicy.force(CacheTypes.THREAD_LOCAL);
-        try {
-            this.erf = (AbstractERF)
-                    Class.forName(hazardParameters.getErfName())
-                            .getDeclaredConstructor()
-                            .newInstance();
-        } catch (ClassNotFoundException |
-                 NoSuchMethodException |
-                 IllegalAccessException |
-                 InstantiationException |
-                 InvocationTargetException e) {
+//    	SurfaceCachingPolicy.force(CacheTypes.THREAD_LOCAL);
 
-            throw new IllegalArgumentException(
-                    "Failed to instantiate ERF class: " + hazardParameters.getErfName(), e
-            );
-        }
-        
-        this.filterManager = hazardParameters.buildSourceManager();  
-        this.sourceFilters = filterManager.getEnabledFilters();
-        
-        this.erf.getTimeSpan().setDuration(hazardParameters.getErfDuration());
-        this.erf.updateForecast();
+    	this.erf = ErfBuilder.build(hazardParameters);
+
+    	this.filterManager = hazardParameters.buildSourceManager();
+    	this.sourceFilters = filterManager.getEnabledFilters();
       
         this.gmmRef = AttenRelRef.valueOf(hazardParameters.getGmmName().toUpperCase());
         
@@ -162,6 +147,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
         List<SiteKey> siteKeys = new ArrayList<>(portfolio.getSiteKeys());
 
         int totalSiteImKeys = countTotalSiteImKeys();
+        int counterIncrement = 10;
         AtomicInteger counter = new AtomicInteger();
         long startTime = System.nanoTime();
         
@@ -321,7 +307,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
                         // ----- PROGRESS -----
                         int done = counter.incrementAndGet();
 
-                        if (done % 100 == 0 || done == totalSiteImKeys) {
+                        if (done % counterIncrement == 0 || done == totalSiteImKeys) {
 
                             long now = System.nanoTime();
 

@@ -43,7 +43,9 @@ import com.google.common.collect.Table;
 public class TrueMeanERFDemo {
 
 	public static void main(String[] args) throws IOException {
-		File dataDir = new File("/home/kevin/OpenSHA/fss_inversions/2024_02_02-nshm23_branches-WUS_FM_v3-gridded_rebuild");
+		File dataDir = new File(
+		"C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\logic_tree_reweighting\\2024_02_02-nshm23_branches-WUS_FM_v3-gridded_rebuild"
+				);
 		
 		System.out.println("Loading solutions");
 		
@@ -59,9 +61,9 @@ public class TrueMeanERFDemo {
 		
 		// use the branch-averaged gridded seismicity model
 		GridSourceList meanGridList = trueMeanSol.requireModule(GridSourceList.class);
+		// filter it to only M>5 in order to speed things up later (ruptures below that are skipped anyway)
 		meanGridList = meanGridList.getAboveMinMag(5f);
 		trueMeanSol.setGridSourceProvider(meanGridList);
-		// filter it to only M>5 in order to speed things up later (ruptures below that are skipped anyway)
 		// mapping between grid location, TRT, and source index in the grid sources
 		Table<Integer, TectonicRegionType, Integer> meanLocToSourceTable = HashBasedTable.create();
 		for (int s=0; s<meanGridList.getNumSources(); s++) {
