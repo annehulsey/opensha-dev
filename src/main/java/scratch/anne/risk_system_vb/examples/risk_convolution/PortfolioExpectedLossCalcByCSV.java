@@ -1,8 +1,7 @@
-package scratch.anne.risk_system_vb.examples;
+package scratch.anne.risk_system_vb.examples.risk_convolution;
 
 //TODO removal redundant example. Overridden by DUAL
 
-//
 //import java.nio.file.*;
 //import java.util.*;
 //
@@ -17,7 +16,6 @@ package scratch.anne.risk_system_vb.examples;
 //import scratch.anne.risk_system_vb.domain.structural_response.vulnerabilities.VulnerabilityModel;
 //import scratch.anne.risk_system_vb.engine.convolution.RiskConvolution;
 //import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioRiskConvolutionCalculator;
-//import scratch.anne.risk_system_vb.engine.portfolio_workflow.PortfolioPerRuptureRiskConvolutionCalculator;
 //import scratch.anne.risk_system_vb.io.readers.ParseRiskRunParametersCSV;
 //import scratch.anne.risk_system_vb.io.readers.PortfolioReader;
 //import scratch.anne.risk_system_vb.io.readers.VulnerabilityLibraryReader;
@@ -26,16 +24,18 @@ package scratch.anne.risk_system_vb.examples;
 //import scratch.anne.risk_system_vb.domain.portfolio.portfolio_wrappers.RiskConvolutionPortfolio.ConvolutionMode;
 //import scratch.anne.risk_system_vb.util.IO;
 //
+//
+//
 ///**
 // * Fully dynamic CSV-driven Expected Loss Portfolio runner with input verification.
 // */
-//public class PortfolioPerRuptureExpectedLossCalcByCSV {
+//public class PortfolioExpectedLossCalcByCSV {
 //
 //    public static void main(String[] args) throws Exception {
 //    	
 //    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\openSRA\\software architecture\\my_scratch\\conversion to Java project\\BERM_test-outputs\\_vb\\csv_inputs");
 ////    	Path inputFolder = Path.of("p366\\PorterVulns");
-//    	Path inputFolder = Path.of("tests\\short_portfolio_25yr_rate_riemann");
+//    	Path inputFolder = Path.of("tests\\short_portfolio_25yr_riemann");
 //    	
 ////    	Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\full_hcurve\\gem_vulns");
 ////    	Path inputFolder = Path.of("hazus-taxonomy_vs30-365");
@@ -70,14 +70,11 @@ package scratch.anne.risk_system_vb.examples;
 //
 //        // ------------------- 2. create output paths inside run folder -------------------
 //        String fileTag = config.getOrDefault("file_tag", runFolder.getFileName().toString());
-//        Path outputCSV = runFolder.resolve(fileTag + "_per-rup.csv");
-////        Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated.csv");
-////        Path hazardJson = writeHazard
-////                ? runFolder.resolve(fileTag + "_hazard-list.json")
-////                : null;
-////        Path hazardJson = writeHazard
-////                ? runFolder.resolve(fileTag + "_hazard-list.json")
-////                : null;
+//        Path outputCSV = runFolder.resolve(fileTag + ".csv");
+//        Path aggregatedOutputCSV = runFolder.resolve(fileTag + "_aggregated.csv");
+//        Path hazardJson = writeHazard
+//                ? runFolder.resolve(fileTag + "_hazard-list.json")
+//                : null;
 //
 //        
 //        // ------------------- 3. prepare hazard and integration parameters ----------------
@@ -121,8 +118,8 @@ package scratch.anne.risk_system_vb.examples;
 //        RiskConvolutionPortfolio riskConvolutionPortfolio = new RiskConvolutionPortfolio(basePortfolio, expVulnLib);
 //
 //        // ------------------- 8. Create calculator -------------------  
-//        PortfolioPerRuptureRiskConvolutionCalculator calculator =
-//                new PortfolioPerRuptureRiskConvolutionCalculator(
+//        PortfolioRiskConvolutionCalculator calculator =
+//                new PortfolioRiskConvolutionCalculator(
 //                        riskConvolutionPortfolio,
 //                        expVulnLib,
 //                        hazardParameters,
@@ -132,17 +129,20 @@ package scratch.anne.risk_system_vb.examples;
 //        // ------------------- 9. Compute Expected Loss -------------------
 //        System.out.println("Running calculator...");
 //        riskConvolutionPortfolio = calculator.computeRisk();
-//        riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.PER_RUPTURE);
-//        riskConvolutionPortfolio.exportRuptureResults(outputCSV);
+//        riskConvolutionPortfolio.assertConvolutionExecutedAs(ConvolutionMode.FULL_HCURVE);
+//        riskConvolutionPortfolio.exportHazard(hazardJson);
 //        
-//        System.out.printf(
-//        	    "totalLoss %.3g%n",
-//        	    riskConvolutionPortfolio.getRuptureResults().getTotalLoss()
-//        	);
-//        
+//        ExpectedLossPortfolioAggregator aggregator = new ExpectedLossPortfolioAggregator(riskConvolutionPortfolio);
+//        aggregator.printSummary();
+//
+//        // ------------------- 10. Write outputs to run folder -------------------
+//        aggregator.writeCSV(outputCSV);
+//        aggregator.writeAggregatedCSV(aggregatedOutputCSV);
+//
 //        System.out.println("Outputs written to run folder:");
 //        System.out.println(outputCSV);
-//
+//        System.out.println(aggregatedOutputCSV);
+//        System.out.println(hazardJson);
 //        
 //    }
 //

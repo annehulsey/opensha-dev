@@ -48,6 +48,8 @@ dependencies {
     implementation 'org.apache.parquet:parquet-avro:1.15.1'
     implementation 'org.apache.avro:avro:1.12.1'
 
+    implementation 'org.duckdb:duckdb_jdbc:1.5.5.1'
+
     testImplementation 'junit:junit:4.13.2'
 }
 

@@ -1,4 +1,4 @@
-package scratch.anne.risk_system_vb.examples;
+package scratch.anne.risk_system_vb.examples.risk_convolution;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

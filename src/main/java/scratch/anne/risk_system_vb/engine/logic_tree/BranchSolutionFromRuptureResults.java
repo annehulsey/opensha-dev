@@ -35,6 +35,8 @@ import com.google.common.collect.Table;
 import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
 import scratch.anne.risk_system_vb.io.readers.TrueMeanSetupFromRuptureResults;
 import scratch.anne.risk_system_vb.io.readers.TrueMeanSetupFromRuptureResults.TrueMeanSetup;
+import scratch.anne.risk_system_vb.io.writers.LogicTreeBranchEalSummaryExporter;
+import scratch.anne.risk_system_vb.io.writers.LogicTreeBranchRuptureContributionExporter;
 import scratch.anne.risk_system_vb.io.readers.RuptureLossLookupReader;
 
 public class BranchSolutionFromRuptureResults {
@@ -49,18 +51,23 @@ public class BranchSolutionFromRuptureResults {
 		// exported RuptureResultsExporter CSV instead of a hardcoded
 		// construction sequence.
 		// ------------------------------------------------------------
-		Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL");
-		Path inputFolder = Path.of("true_mean_solution");
+		Path baseFolder = Path.of("C:\\Users\\ahulsey\\OneDrive - DOI\\Desktop\\Research\\BERM\\results\\EAL\\true_mean_solution");
+		Path inputFolder = Path.of("RES1-W1-MC_Porter-vuln_vs-360");
+		
+		
+		// Cap the number of branches processed, for quick tests. Set to Integer.MAX_VALUE to run the full tree.
+//		int maxBranches = 10;
+		int maxBranches = Integer.MAX_VALUE;
 
 		// defaults to the folder name, matching PortfolioExpectedLossDualCalcByCSV's
 		// own fallback. Override this if that run used an explicit file_tag.
 		String fileTag = inputFolder.getFileName().toString();
 		// String fileTag = "some_other_tag"; // uncomment/edit if file_tag was set explicitly
 
-		Path exportedCsv = baseFolder.resolve(inputFolder).resolve(fileTag + "_per-rup.csv");
+		Path exportCsv = baseFolder.resolve(inputFolder).resolve(fileTag + "_eal-per-rup.csv");
 
-		System.out.println("Rebuilding true mean ERF from exported HazardParameters: " + exportedCsv);
-		TrueMeanSetup setup = TrueMeanSetupFromRuptureResults.rebuild(exportedCsv);
+		System.out.println("Rebuilding true mean ERF from exported HazardParameters: " + exportCsv);
+		TrueMeanSetup setup = TrueMeanSetupFromRuptureResults.rebuild(exportCsv);
 
 		FaultSystemSolution trueMeanSol = setup.trueMeanSol();
 		BaseFaultSystemSolutionERF trueMeanERF = setup.trueMeanERF();
@@ -83,7 +90,7 @@ public class BranchSolutionFromRuptureResults {
 		// derived from likelihood*ruptureLoss, so neither is meaningful
 		// input here.
 		// ------------------------------------------------------------
-		Map<RuptureKey, Double> ruptureLossLookup = RuptureLossLookupReader.read(exportedCsv);
+		Map<RuptureKey, Double> ruptureLossLookup = RuptureLossLookupReader.read(exportCsv);
 		System.out.println("Loaded fixed loss lookup for " + ruptureLossLookup.size() + " ruptures");
 
 		// downsampled model with 1k branches (fault and gridded) -- this
@@ -104,16 +111,16 @@ public class BranchSolutionFromRuptureResults {
 
 		// iterate over the solution logic tree
 		LogicTree<?> logicTree = slt.getLogicTree();
-
-		// TEMPORARY: cap the number of branches processed, for quick
-		// tests. Set to Integer.MAX_VALUE (or remove the Math.min) to
-		// run the full tree.
-//		int maxBranches = 10;
-		int maxBranches = Integer.MAX_VALUE;
 		
 		int numBranchesToRun = Math.min(maxBranches, logicTree.size());
 		if (numBranchesToRun < logicTree.size())
 			System.out.println("TEST MODE: only running " + numBranchesToRun + "/" + logicTree.size() + " branches");
+		
+		String fileSuffix = numBranchesToRun < logicTree.size() ? "_subset-n-" + numBranchesToRun : "";
+		Path branchEALsCsv = baseFolder.resolve(inputFolder).resolve(
+		        fileTag + "_branch-eals" + fileSuffix + ".csv");
+		
+		Path branchContributionsParquet = baseFolder.resolve(inputFolder).resolve(fileTag + "_branch-rupture-contributions" + fileSuffix + ".parquet");
 
 		// per-branch EAL results, indexed by branch index b. Fine as a
 		// plain array up to millions of branches (a few MB at most);
@@ -131,242 +138,222 @@ public class BranchSolutionFromRuptureResults {
 		// just waiting on I/O to load the solutions for each branch
 		CompletableFuture<FaultSystemSolution> preloadFuture = null;
 		Stopwatch watch = Stopwatch.createStarted();
-		for (int b=0; b<numBranchesToRun; b++) {
-			LogicTreeBranch<?> branch = logicTree.getBranch(b);
-			// will usually be the same for all branches if downsampled, but a branch can be drawn multiple times which
-			// increases its weight
-			double branchWeight = logicTree.getBranchWeight(branch);
-
-			System.out.println("Handling branch "+b+"/"+numBranchesToRun+": "+branch+" (wt="+(float)branchWeight+")");
-			System.out.println("\tLoading solution...");
-			FaultSystemSolution branchSol;
-			if (preloadFuture == null)
-				branchSol = slt.forBranch(branch);
-			else
-				branchSol = preloadFuture.join();
-			FaultSystemRupSet branchRupSet = branchSol.getRupSet();
-			GridSourceList branchGridList = branchSol.requireModule(GridSourceList.class);
-			System.out.println("\t\tSolution is ready");
-
-			// start the next load in parallel
-			int nextIndex = b+1;
-			if (nextIndex < numBranchesToRun) {
-				preloadFuture = CompletableFuture.supplyAsync(()->{
-					FaultSystemSolution futureSol;
-					try {
-						futureSol = slt.forBranch(logicTree.getBranch(nextIndex));
-					} catch (IOException e) {
-						throw ExceptionUtils.asRuntimeException(e);
-					}
-					// have it proload the grid sources
-					futureSol.getGridSourceProvider();
-					return futureSol;
-				});
-			}
-
-			// per-branch EAL accumulator: local to this branch/thread only,
-			// no shared mutable state -- safe if this loop is parallelized
-			// later (see BranchEALCalculator's class-level javadoc).
-			BranchEALCalculator branchCalc = new BranchEALCalculator(ruptureLossLookup);
-
-			System.out.println("\tValidating FSS rupture mappings...");
-
-			// this gives, for each on-fault rupture in my branch, the corresponding index in the true mean solution
-			int[] branchRupIndexes = branchMappings.getRuptureMappings(branch);
-
-			int numMappedFSS = 0;
-			double mappedFSSRate = 0d;
-
-			// find mappings for each fault-based rupture
-			for (int i=0; i<branchRupIndexes.length; i++) {
-				// this is the rate for that rupture on this branch
-				// you can convert to a Poisson probability
-				double rupRate = branchSol.getRateForRup(i);
-
-				int trueMeanIndex = branchRupIndexes[i];
-				if (trueMeanIndex < 0) {
-					// not mapped, must be zero rate
-					Preconditions.checkState(rupRate == 0d);
-					continue;
-				} else if (rupRate == 0d) {
-					// mapped, but still zero
-					continue;
-				}
-
-				// source index in the true mean ERF for this rupture
-				int trueMeanSourceIndex = trueMeanERF.getSrcIndexForFltSysRup(trueMeanIndex);
-				ProbEqkSource trueMeanSource = trueMeanERF.getSource(trueMeanSourceIndex);
-				// now we need to find the one with the correct magnitude
-				int trueMeanRupIndexInSource = -1;
-				double rupMag = branchRupSet.getMagForRup(i);
-				for (int rupIndex=0; rupIndex<trueMeanSource.getNumRuptures(); rupIndex++) {
-					ProbEqkRupture rup = trueMeanSource.getRupture(rupIndex);
-					if (Precision.equals(rup.getMag(), rupMag)) {
-						Preconditions.checkState(trueMeanRupIndexInSource < 0, "Duplicate match found?");
-						trueMeanRupIndexInSource = rupIndex;
-					}
-				}
-
-				Preconditions.checkState(trueMeanRupIndexInSource >= 0,
-						"No matching rupture found for branch %s FSS rupture %s with rate=%s",
-						b, i, rupRate);
-
-				// now we know that the true mean ERF's rupture for this branch is at:
-				// 		sourceIndex=trueMeanSourceIndex, ruptureIndex=trueMeanRupIndexInSource
-				// accumulate this rupture's contribution to the branch's EAL,
-				// using the FIXED loss recorded for this rupture in the
-				// true-mean run (see BranchEALCalculator)
-				branchCalc.accumulateFault(trueMeanSourceIndex, trueMeanRupIndexInSource, rupRate);
-
-				numMappedFSS++;
-				mappedFSSRate += rupRate;
-			}
-			System.out.println("\t\tMapped "+numMappedFSS+"/"+branchRupIndexes.length+" FSS ruptures with total rate "+(float)mappedFSSRate);
-			branchFssRates[b] = mappedFSSRate;
-
-			System.out.println("\tValidating gridded rupture mappings...");
-			// now find mappings for each gridded seismicity rupture
-			Preconditions.checkState(branchGridList.getNumLocations() == meanGridList.getNumLocations(),
-					"Branch %s grid list has %s locations, but mean has %s", b, branchGridList.getNumLocations(), meanGridList.getNumLocations());
-			Preconditions.checkState(branchGridList.getNumSources() <= meanGridList.getNumSources(),
-					"Branch %s grid list has %s sources, but mean has %s", b, branchGridList.getNumSources(), meanGridList.getNumSources());
-			int numMappedGrid = 0;
-			double mappedGridRate = 0d;
-			// this will be used to speed up rupture mapping; most sources will have the same rupture lists over and
-			// over again, so doing the index search for each rupture is wasteful; this keeps track of the indexes
-			// from the prior source and reuses it if they agree, but if anything varies, it'll start fresh.
-			int[] prevMappings = null;
-			int numSourceMappingsReused = 0;
-			for (int s=0; s<branchGridList.getNumSources(); s++) {
-				int gridIndex = branchGridList.getLocationIndexForSource(s);
-				TectonicRegionType trt = branchGridList.tectonicRegionTypeForSourceIndex(s);
-				Preconditions.checkState(meanLocToSourceTable.contains(gridIndex, trt));
-				// true mean ERF source index is the number of FSS sources, plus source index in the grid list
-				int trueMeanSourceIndex = trueMeanERF.getNumFaultSystemSources()+meanLocToSourceTable.get(gridIndex, trt);
-				ProbEqkSource source = trueMeanERF.getSource(trueMeanSourceIndex);
-				Preconditions.checkState(source instanceof PointSource,
-						"True mean source %s isn't a point source? %s", trueMeanSourceIndex, source.getClass());
-				PointSource ptSource = (PointSource)source;
-				int numSourceRups = ptSource.getNumRuptures();
-				List<ProbEqkRupture> sourceRups = ptSource.getRuptureList();
-
-				Location loc = branchGridList.getLocation(gridIndex);
-				Preconditions.checkState(LocationUtils.areSimilar(loc, ptSource.getLocation()));
-				List<GriddedRupture> gridRups = branchGridList.getRuptures(branchGridList.tectonicRegionTypeForSourceIndex(s), gridIndex);
-
-				int[] myMappings = null;
-				if (prevMappings == null || gridRups.size() != prevMappings.length) {
-					// definitely not a match with the prior source, track our mappings in case they can be used in the
-					// future;
-					prevMappings = null;
-					myMappings = new int[gridRups.size()];
-				}
-				for (int g=0; g<gridRups.size(); g++) {
-					GriddedRupture gridRup = gridRups.get(g);
-					if (gridRup.properties.magnitude < gridMinMag)
-						continue;
-					// find a matching rupture in the ERF source
-					int trueMeanRupIndexInSource;
-					if (prevMappings != null && prevMappings[g] < numSourceRups && isGridMatch(gridRup, sourceRups.get(prevMappings[g]))) {
-						// already matched by a prior source, just use that
-						trueMeanRupIndexInSource = prevMappings[g];
-					} else {
-						// need to search for it (slow)
-						prevMappings = null;
-						trueMeanRupIndexInSource = -1;
-						for (int rupIndex=0; rupIndex<numSourceRups; rupIndex++) {
-							ProbEqkRupture rup = sourceRups.get(rupIndex);
-							if (isGridMatch(gridRup, rup)) {
-								Preconditions.checkState(trueMeanRupIndexInSource < 0, "Duplicate match found?");
-								trueMeanRupIndexInSource = rupIndex;
-							}
+		
+		try (LogicTreeBranchRuptureContributionExporter contribExporter = new LogicTreeBranchRuptureContributionExporter(branchContributionsParquet)) {
+			for (int b=0; b<numBranchesToRun; b++) {
+				LogicTreeBranch<?> branch = logicTree.getBranch(b);
+				// will usually be the same for all branches if downsampled, but a branch can be drawn multiple times which
+				// increases its weight
+				double branchWeight = logicTree.getBranchWeight(branch);
+	
+				System.out.println("Handling branch "+b+"/"+numBranchesToRun+": "+branch+" (wt="+(float)branchWeight+")");
+				System.out.println("\tLoading solution...");
+				FaultSystemSolution branchSol;
+				if (preloadFuture == null)
+					branchSol = slt.forBranch(branch);
+				else
+					branchSol = preloadFuture.join();
+				FaultSystemRupSet branchRupSet = branchSol.getRupSet();
+				GridSourceList branchGridList = branchSol.requireModule(GridSourceList.class);
+				System.out.println("\t\tSolution is ready");
+	
+				// start the next load in parallel
+				int nextIndex = b+1;
+				if (nextIndex < numBranchesToRun) {
+					preloadFuture = CompletableFuture.supplyAsync(()->{
+						FaultSystemSolution futureSol;
+						try {
+							futureSol = slt.forBranch(logicTree.getBranch(nextIndex));
+						} catch (IOException e) {
+							throw ExceptionUtils.asRuntimeException(e);
 						}
-					}
-					Preconditions.checkState(trueMeanRupIndexInSource >= 0,
-							"No matching rupture found for branch %s grid source %s rupture: %s",
-							b, s, gridRup);
-					if (myMappings != null)
-						myMappings[g] = trueMeanRupIndexInSource;
-
+						// have it proload the grid sources
+						futureSol.getGridSourceProvider();
+						return futureSol;
+					});
+				}
+	
+				// per-branch EAL accumulator: local to this branch/thread only,
+				// no shared mutable state -- safe if this loop is parallelized
+				// later (see BranchEALCalculator's class-level javadoc).
+				BranchEALCalculator branchCalc = new BranchEALCalculator(ruptureLossLookup);
+	
+				System.out.println("\tValidating FSS rupture mappings...");
+	
+				// this gives, for each on-fault rupture in my branch, the corresponding index in the true mean solution
+				int[] branchRupIndexes = branchMappings.getRuptureMappings(branch);
+	
+				int numMappedFSS = 0;
+				double mappedFSSRate = 0d;
+	
+				// find mappings for each fault-based rupture
+				for (int i=0; i<branchRupIndexes.length; i++) {
 					// this is the rate for that rupture on this branch
 					// you can convert to a Poisson probability
-					double rupRate = gridRup.rate;
-
+					double rupRate = branchSol.getRateForRup(i);
+	
+					int trueMeanIndex = branchRupIndexes[i];
+					if (trueMeanIndex < 0) {
+						// not mapped, must be zero rate
+						Preconditions.checkState(rupRate == 0d);
+						continue;
+					} else if (rupRate == 0d) {
+						// mapped, but still zero
+						continue;
+					}
+	
+					// source index in the true mean ERF for this rupture
+					int trueMeanSourceIndex = trueMeanERF.getSrcIndexForFltSysRup(trueMeanIndex);
+					ProbEqkSource trueMeanSource = trueMeanERF.getSource(trueMeanSourceIndex);
+					// now we need to find the one with the correct magnitude
+					int trueMeanRupIndexInSource = -1;
+					double rupMag = branchRupSet.getMagForRup(i);
+					for (int rupIndex=0; rupIndex<trueMeanSource.getNumRuptures(); rupIndex++) {
+						ProbEqkRupture rup = trueMeanSource.getRupture(rupIndex);
+						if (Precision.equals(rup.getMag(), rupMag)) {
+							Preconditions.checkState(trueMeanRupIndexInSource < 0, "Duplicate match found?");
+							trueMeanRupIndexInSource = rupIndex;
+						}
+					}
+	
+					Preconditions.checkState(trueMeanRupIndexInSource >= 0,
+							"No matching rupture found for branch %s FSS rupture %s with rate=%s",
+							b, i, rupRate);
+	
 					// now we know that the true mean ERF's rupture for this branch is at:
 					// 		sourceIndex=trueMeanSourceIndex, ruptureIndex=trueMeanRupIndexInSource
-					branchCalc.accumulateGridded(trueMeanSourceIndex, trueMeanRupIndexInSource, rupRate);
+					// accumulate this rupture's contribution to the branch's EAL,
+					// using the FIXED loss recorded for this rupture in the
+					// true-mean run (see BranchEALCalculator)
+					branchCalc.accumulateFault(trueMeanSourceIndex, trueMeanRupIndexInSource, rupRate);
+					
+		            Double rupLoss = ruptureLossLookup.get(new RuptureKey(trueMeanSourceIndex, trueMeanRupIndexInSource));
+		            if (rupLoss != null)
+		                contribExporter.write(b, trueMeanSourceIndex, trueMeanRupIndexInSource, rupLoss, rupRate);
 
-					numMappedGrid++;
-					mappedGridRate += rupRate;
+	
+					numMappedFSS++;
+					mappedFSSRate += rupRate;
 				}
-				if (myMappings != null)
-					prevMappings = myMappings;
-				else if (prevMappings != null)
-					numSourceMappingsReused++;
+				System.out.println("\t\tMapped "+numMappedFSS+"/"+branchRupIndexes.length+" FSS ruptures with total rate "+(float)mappedFSSRate);
+				branchFssRates[b] = mappedFSSRate;
+	
+				System.out.println("\tValidating gridded rupture mappings...");
+				// now find mappings for each gridded seismicity rupture
+				Preconditions.checkState(branchGridList.getNumLocations() == meanGridList.getNumLocations(),
+						"Branch %s grid list has %s locations, but mean has %s", b, branchGridList.getNumLocations(), meanGridList.getNumLocations());
+				Preconditions.checkState(branchGridList.getNumSources() <= meanGridList.getNumSources(),
+						"Branch %s grid list has %s sources, but mean has %s", b, branchGridList.getNumSources(), meanGridList.getNumSources());
+				int numMappedGrid = 0;
+				double mappedGridRate = 0d;
+				// this will be used to speed up rupture mapping; most sources will have the same rupture lists over and
+				// over again, so doing the index search for each rupture is wasteful; this keeps track of the indexes
+				// from the prior source and reuses it if they agree, but if anything varies, it'll start fresh.
+				int[] prevMappings = null;
+				int numSourceMappingsReused = 0;
+				for (int s=0; s<branchGridList.getNumSources(); s++) {
+					int gridIndex = branchGridList.getLocationIndexForSource(s);
+					TectonicRegionType trt = branchGridList.tectonicRegionTypeForSourceIndex(s);
+					Preconditions.checkState(meanLocToSourceTable.contains(gridIndex, trt));
+					// true mean ERF source index is the number of FSS sources, plus source index in the grid list
+					int trueMeanSourceIndex = trueMeanERF.getNumFaultSystemSources()+meanLocToSourceTable.get(gridIndex, trt);
+					ProbEqkSource source = trueMeanERF.getSource(trueMeanSourceIndex);
+					Preconditions.checkState(source instanceof PointSource,
+							"True mean source %s isn't a point source? %s", trueMeanSourceIndex, source.getClass());
+					PointSource ptSource = (PointSource)source;
+					int numSourceRups = ptSource.getNumRuptures();
+					List<ProbEqkRupture> sourceRups = ptSource.getRuptureList();
+	
+					Location loc = branchGridList.getLocation(gridIndex);
+					Preconditions.checkState(LocationUtils.areSimilar(loc, ptSource.getLocation()));
+					List<GriddedRupture> gridRups = branchGridList.getRuptures(branchGridList.tectonicRegionTypeForSourceIndex(s), gridIndex);
+	
+					int[] myMappings = null;
+					if (prevMappings == null || gridRups.size() != prevMappings.length) {
+						// definitely not a match with the prior source, track our mappings in case they can be used in the
+						// future;
+						prevMappings = null;
+						myMappings = new int[gridRups.size()];
+					}
+					for (int g=0; g<gridRups.size(); g++) {
+						GriddedRupture gridRup = gridRups.get(g);
+						if (gridRup.properties.magnitude < gridMinMag)
+							continue;
+						// find a matching rupture in the ERF source
+						int trueMeanRupIndexInSource;
+						if (prevMappings != null && prevMappings[g] < numSourceRups && isGridMatch(gridRup, sourceRups.get(prevMappings[g]))) {
+							// already matched by a prior source, just use that
+							trueMeanRupIndexInSource = prevMappings[g];
+						} else {
+							// need to search for it (slow)
+							prevMappings = null;
+							trueMeanRupIndexInSource = -1;
+							for (int rupIndex=0; rupIndex<numSourceRups; rupIndex++) {
+								ProbEqkRupture rup = sourceRups.get(rupIndex);
+								if (isGridMatch(gridRup, rup)) {
+									Preconditions.checkState(trueMeanRupIndexInSource < 0, "Duplicate match found?");
+									trueMeanRupIndexInSource = rupIndex;
+								}
+							}
+						}
+						Preconditions.checkState(trueMeanRupIndexInSource >= 0,
+								"No matching rupture found for branch %s grid source %s rupture: %s",
+								b, s, gridRup);
+						if (myMappings != null)
+							myMappings[g] = trueMeanRupIndexInSource;
+	
+						// this is the rate for that rupture on this branch
+						// you can convert to a Poisson probability
+						double rupRate = gridRup.rate;
+	
+						// now we know that the true mean ERF's rupture for this branch is at:
+						// 		sourceIndex=trueMeanSourceIndex, ruptureIndex=trueMeanRupIndexInSource
+						branchCalc.accumulateGridded(trueMeanSourceIndex, trueMeanRupIndexInSource, rupRate);
+						
+			            Double rupLoss = ruptureLossLookup.get(new RuptureKey(trueMeanSourceIndex, trueMeanRupIndexInSource));
+			            if (rupLoss != null)
+			                contribExporter.write(b, trueMeanSourceIndex, trueMeanRupIndexInSource, rupLoss, rupRate);
+
+	
+						numMappedGrid++;
+						mappedGridRate += rupRate;
+					}
+					if (myMappings != null)
+						prevMappings = myMappings;
+					else if (prevMappings != null)
+						numSourceMappingsReused++;
+				}
+				System.out.println("\t\tMapped "+numMappedGrid+" gridded ruptures across "+branchGridList.getNumSources()
+						+" sources with total rate "+(float)mappedGridRate+" ("+numSourceMappingsReused+" source mappings reused)");
+				branchGriddedRates[b] = mappedGridRate;
+	
+				// EAL for this branch, recalculated from this branch's rates
+				// against the FIXED true-mean loss lookup -- cheap, no
+				// GMM/vulnerability recomputation needed (confirmed: only
+				// rates vary per branch, not losses).
+				branchEALs[b] = branchCalc.getEAL();
+				System.out.println("\tBranch "+b+" EAL: "+branchEALs[b]);
+	
+				System.out.println("\tDone with branch "+b+"/"+numBranchesToRun+"; "+timeStr(watch)+" elapsed, estimated "
+						+timeLeftStr(watch, b+1, numBranchesToRun)+" remaining");
+	
 			}
-			System.out.println("\t\tMapped "+numMappedGrid+" gridded ruptures across "+branchGridList.getNumSources()
-					+" sources with total rate "+(float)mappedGridRate+" ("+numSourceMappingsReused+" source mappings reused)");
-			branchGriddedRates[b] = mappedGridRate;
-
-			// EAL for this branch, recalculated from this branch's rates
-			// against the FIXED true-mean loss lookup -- cheap, no
-			// GMM/vulnerability recomputation needed (confirmed: only
-			// rates vary per branch, not losses).
-			branchEALs[b] = branchCalc.getEAL();
-			System.out.println("\tBranch "+b+" EAL: "+branchEALs[b]);
-
-			System.out.println("\tDone with branch "+b+"/"+numBranchesToRun+"; "+timeStr(watch)+" elapsed, estimated "
-					+timeLeftStr(watch, b+1, numBranchesToRun)+" remaining");
-
 		}
 		System.out.println("DONE");
 		watch.stop();
 		System.out.println("Took "+timeStr(watch));
 
-		// ------------------------------------------------------------
-		// PLACEHOLDER output -- just a quick dump, not the final export
-		// design. One row per branch: index, weight, EAL, total mapped
-		// rates (sanity-check numbers), plus one column per logic-tree
-		// branch level (fault model, deformation model, scaling
-		// relationship, etc.), so branches can be filtered/grouped by
-		// any single choice later.
-		//
-		// branch.size() is fixed at construction (levels is an
-		// ImmutableList set once in LogicTreeBranch.init(...)) and every
-		// branch drawn from this same SolutionLogicTree shares the same
-		// levels list, so it's safe to read the level headers once from
-		// branch 0 and reuse them for every row.
-		// ------------------------------------------------------------
-		LogicTreeBranch<?> branch0 = logicTree.getBranch(0);
-		int numLevels = branch0.size();
-		String[] levelHeaders = new String[numLevels];
-		for (int i=0; i<numLevels; i++)
-			levelHeaders[i] = branch0.getLevel(i).getShortName();
-
-		Path branchEALsCsv = baseFolder.resolve(inputFolder).resolve(
-				fileTag + "_branch-eals" + (numBranchesToRun < logicTree.size() ? "_subset-n-" + numBranchesToRun : "") + ".csv");
-		try (java.io.BufferedWriter w = java.nio.file.Files.newBufferedWriter(branchEALsCsv)) {
-			StringBuilder header = new StringBuilder("branchIndex,branchWeight,eal,totalFssRate,totalGriddedRate");
-			for (String levelHeader : levelHeaders)
-				header.append(',').append(levelHeader);
-			w.write(header.toString());
-			w.newLine();
-
-			for (int b=0; b<numBranchesToRun; b++) {
-				LogicTreeBranch<?> branch = logicTree.getBranch(b);
-				double branchWeight = logicTree.getBranchWeight(branch);
-
-				StringBuilder row = new StringBuilder();
-				row.append(b).append(',').append(branchWeight).append(',').append(branchEALs[b])
-						.append(',').append(branchFssRates[b]).append(',').append(branchGriddedRates[b]);
-				for (int i=0; i<numLevels; i++) {
-					var value = branch.getValue(i);
-					row.append(',').append(value == null ? "" : value.getFilePrefix());
-				}
-				w.write(row.toString());
-				w.newLine();
-			}
+		List<LogicTreeBranchEalSummaryExporter.BranchEalRow> rows = new java.util.ArrayList<>(numBranchesToRun);
+		for (int b = 0; b < numBranchesToRun; b++) {
+		    rows.add(new LogicTreeBranchEalSummaryExporter.BranchEalRow(
+		            b,
+		            logicTree.getBranchWeight(logicTree.getBranch(b)),
+		            branchEALs[b],
+		            branchFssRates[b],
+		            branchGriddedRates[b],
+		            logicTree.getBranch(b)));
 		}
+		LogicTreeBranchEalSummaryExporter.write(rows, logicTree, branchEALsCsv);
 		System.out.println("Wrote branch EALs to: " + branchEALsCsv);
 	}
 

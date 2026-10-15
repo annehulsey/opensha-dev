@@ -89,7 +89,7 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
     	this.hazardParameters = hazardParameters;
     	this.integrationMethod = integrationMethod;
                 
-//    	SurfaceCachingPolicy.force(CacheTypes.THREAD_LOCAL);
+    	SurfaceCachingPolicy.force(CacheTypes.THREAD_LOCAL);
 
     	this.erf = ErfBuilder.build(hazardParameters);
 

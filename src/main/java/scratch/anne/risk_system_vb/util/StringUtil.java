@@ -1,5 +1,7 @@
 package scratch.anne.risk_system_vb.util;
 
+import java.text.DecimalFormat;
+
 import scratch.anne.risk_system_vb.util.enums.IMT;
 
 public class StringUtil {
@@ -77,5 +79,16 @@ public class StringUtil {
             return defaultVal;
         }
         return Double.parseDouble(s.trim());
+    }
+    
+    
+    /** Canonical string form of a likelihood level, avoiding scientific-notation/formatting drift across runs. */
+    public static String formatLikelihood(double level) {
+        return new DecimalFormat("0.0###E0").format(level);
+    }
+    
+    /** Canonical string form of a percentile, avoiding (int) truncation dropping values like 2.5 or 97.5. */
+    public static String formatPercentile(double p) {
+        return new DecimalFormat("0.#").format(p);
     }
 }

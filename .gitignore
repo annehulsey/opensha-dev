@@ -6,6 +6,7 @@ bin
 build
 classes
 tmp
+*.tmp
 Scratch*.java
 .DS_Store
 *.log
