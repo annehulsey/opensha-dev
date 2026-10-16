@@ -30,7 +30,9 @@ public final class RuptureResultsExporter {
               "namespace": "scratch.anne.risk_system_vb",
               "fields": [
                 {"name": "sourceId",             "type": "int"},
+                {"name": "fltSysRupIndex",       "type": ["null", "int"], "default": null},
                 {"name": "ruptureId",            "type": "int"},
+                {"name": "magnitude",            "type": "double"},
                 {"name": "likelihood",           "type": "double"},
                 {"name": "ruptureLoss",          "type": "double"},
                 {"name": "lossContribution",     "type": "double"},
@@ -121,7 +123,9 @@ public final class RuptureResultsExporter {
             for (RuptureResult r : collection.results()) {
                 GenericRecord record = new GenericData.Record(SCHEMA);
                 record.put("sourceId",            r.key().sourceId());
+                record.put("fltSysRupIndex",      r.fltSysRupIndex());
                 record.put("ruptureId",           r.key().ruptureId());
+                record.put("magnitude",           r.magnitude());
                 record.put("likelihood",          r.likelihood());
                 record.put("ruptureLoss",         r.ruptureLoss());
                 record.put("lossContribution",    r.lossContribution());
@@ -168,7 +172,7 @@ public final class RuptureResultsExporter {
             writeParam(writer, "totalExpectedLoss", totalExpectedLossStr);
             writer.newLine();
 
-            writer.write("sourceId,ruptureId,likelihood,ruptureLoss,lossContribution,relativeContribution");
+            writer.write("sourceId,fltSysRupIndex,ruptureId,magnitude,likelihood,ruptureLoss,lossContribution,relativeContribution");
             writer.newLine();
 
             for (RuptureResult r : collection.results()) {
@@ -182,7 +186,9 @@ public final class RuptureResultsExporter {
 
     private String formatCsvRow(RuptureResult r) {
         return r.key().sourceId()
-                + "," + r.key().ruptureId()
+        		+ "," + (r.fltSysRupIndex() == null ? "" : r.fltSysRupIndex())
+                + "," + r.key().ruptureId()                
+                + "," + r.magnitude()
                 + "," + r.likelihood()
                 + "," + r.ruptureLoss()
                 + "," + r.lossContribution()

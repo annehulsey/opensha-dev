@@ -76,4 +76,26 @@ public final class LossExceedanceCurve {
 
         return results;
     }
+
+    /**
+     * The cumulative likelihood of this step-function curve evaluated at
+     * an arbitrary loss, not just at one of this curve's own rank points:
+     * the cumulativeLikelihood carried by the nearest point whose loss is
+     * {@code <= targetLoss} (0 if targetLoss is below this curve's
+     * smallest loss) -- the correct value of the step function at any
+     * point, not an approximation.
+     */
+    public double cumulativeLikelihoodAtOrBelow(double targetLoss) {
+        int lo = 0, hi = size() - 1, result = -1;
+        while (lo <= hi) {
+            int mid = (lo + hi) / 2;
+            if (lossAt(mid) <= targetLoss) {
+                result = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return result < 0 ? 0d : cumulativeLikelihoodAt(result);
+    }
 }

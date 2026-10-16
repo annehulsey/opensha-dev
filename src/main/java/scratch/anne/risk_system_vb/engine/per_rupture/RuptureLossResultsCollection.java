@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.opensha.sha.earthquake.AbstractERF;
 import org.opensha.sha.earthquake.ProbEqkRupture;
+import org.opensha.sha.earthquake.faultSysSolution.erf.BaseFaultSystemSolutionERF;
 
 import scratch.anne.risk_system_vb.domain.hazard.HazardParameters;
 import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
@@ -16,6 +17,15 @@ public final class RuptureLossResultsCollection {
     private final HazardParameters hazardParameters;
 
     private final Map<RuptureKey, Double> ruptureLikelihoods;
+    private final Map<RuptureKey, Double> ruptureMagnitudes;
+    /**
+     * Fault-system rupture index for each rupture's source, as given by
+     * {@link BaseFaultSystemSolutionERF#getFltSysRupIndexForSource(int)}.
+     * All ruptures sharing the same source share the same value. This map is
+     * empty when the ERF the results were built from was not a
+     * {@link BaseFaultSystemSolutionERF}.
+     */
+    private final Map<RuptureKey, Integer> fltSysRupIndices;
     
     private final RuptureLossAccumulator accumulator;
     
@@ -27,7 +37,9 @@ public final class RuptureLossResultsCollection {
 
     public RuptureLossResultsCollection(
             HazardParameters hazardParameters,
-            Map<RuptureKey, Double> ruptureLikelihoods
+            Map<RuptureKey, Double> ruptureLikelihoods,
+            Map<RuptureKey, Double> ruptureMagnitudes,
+            Map<RuptureKey, Integer> fltSysRupIndices
     ) {
         this.hazardParameters = hazardParameters;
         
@@ -39,6 +51,8 @@ public final class RuptureLossResultsCollection {
         }
         
         this.ruptureLikelihoods = ruptureLikelihoods;
+        this.ruptureMagnitudes = ruptureMagnitudes;
+        this.fltSysRupIndices = fltSysRupIndices;
         
         this.accumulator = new RuptureLossAccumulator(ruptureLikelihoods.keySet());
         
@@ -59,6 +73,22 @@ public final class RuptureLossResultsCollection {
     
     public double getLikelihood(RuptureKey key) {
         return ruptureLikelihoods.get(key);
+    }
+
+    
+    public double getMagnitude(RuptureKey key) {
+        return ruptureMagnitudes.get(key);
+    }
+    
+    
+    /**
+     * Returns the fault-system rupture index for this rupture's source, or
+     * {@code null} if 
+     *    a) the rupture is from gridded seismicity, or
+     *    b) these results were not built from a {@link BaseFaultSystemSolutionERF}.
+     */
+    public Integer getFltSysRupIndex(RuptureKey key) {
+        return fltSysRupIndices.get(key);
     }
 
     
@@ -142,6 +172,8 @@ public final class RuptureLossResultsCollection {
     public record RuptureResult(
             RuptureKey key,
             double likelihood,
+            double magnitude,
+            Integer fltSysRupIndex,
             double ruptureLoss,
             double lossContribution,
             double relativeContribution
@@ -151,6 +183,8 @@ public final class RuptureLossResultsCollection {
         return new RuptureResult(
                 key,
                 ruptureLikelihoods.get(key),
+                ruptureMagnitudes.get(key),
+                fltSysRupIndices.get(key),
                 accumulator.getLoss(key),
                 lossContributions.getOrDefault(key, 0.0),
                 relativeContributions.getOrDefault(key, 0.0)
@@ -170,6 +204,11 @@ public final class RuptureLossResultsCollection {
      *
      * <p>The supplied ERF must have already had
      * {@code updateForecast()} called.</p>
+     *
+     * <p>If {@code erf} is a {@link BaseFaultSystemSolutionERF}, the
+     * fault-system rupture index for each rupture's source is also captured
+     * (via {@link BaseFaultSystemSolutionERF#getFltSysRupIndexForSource(int)});
+     * otherwise the resulting fault-system rupture index map is empty.</p>
      */
     public static RuptureLossResultsCollection fromERF(
             AbstractERF erf,
@@ -177,12 +216,30 @@ public final class RuptureLossResultsCollection {
     ) {
 
     	Map<RuptureKey, Double> ruptureLikelihoods = new LinkedHashMap<>();
+    	Map<RuptureKey, Double> ruptureMagnitudes = new LinkedHashMap<>();
+    	Map<RuptureKey, Integer> fltSysRupIndices = new LinkedHashMap<>();
+
+    	// only populated per-source below when applicable; left null/unused otherwise
+    	BaseFaultSystemSolutionERF fssErf =
+    	        (erf instanceof BaseFaultSystemSolutionERF b) ? b : null;
+    	// fault-system sources occupy indices [0, numFaultSystemSources) when background
+    	// seismicity (IncludeBackgroundOption.INCLUDE or EXCLUDE) is appended after them;
+    	// under ONLY, every source is a background source and none of them map back to a
+    	// fault-system rupture index
+    	int numFaultSystemSources = (fssErf != null) ? fssErf.getNumFaultSystemSources() : 0;
 
         int numSources = erf.getNumSources();
 
         for (int sourceID = 0; sourceID < numSources; sourceID++) {
 
             int numRuptures = erf.getNumRuptures(sourceID);
+
+            // fault-system rupture index is a property of the source, not of
+            // the individual rupture, so compute it once per source; only
+            // valid for sources that are actually fault-system sources
+            Integer fltSysRupIndex = (fssErf != null && sourceID < numFaultSystemSources)
+                    ? fssErf.getFltSysRupIndexForSource(sourceID)
+                    : null;
 
             for (int ruptureID = 0; ruptureID < numRuptures; ruptureID++) {
 
@@ -209,16 +266,20 @@ public final class RuptureLossResultsCollection {
                         );
                 }
 
-                ruptureLikelihoods.put(
-                        new RuptureKey(sourceID, ruptureID),
-                        likelihood
-                );
+                RuptureKey key = new RuptureKey(sourceID, ruptureID);
+
+                ruptureLikelihoods.put(key, likelihood);
+                ruptureMagnitudes.put(key, rupture.getMag());
+                if (fltSysRupIndex != null)
+                    fltSysRupIndices.put(key, fltSysRupIndex);
             }
         }
 
         return new RuptureLossResultsCollection(
                 hazardParameters,
-                ruptureLikelihoods
+                ruptureLikelihoods,
+                ruptureMagnitudes,
+                fltSysRupIndices
         );
     }
         
