@@ -351,13 +351,13 @@ public class PortfolioPerRuptureRiskConvolutionCalculator {
         double elapsedSeconds = (System.nanoTime() - startTime) / 1e9;
 
         if (elapsedSeconds >= 3600) {
-	            System.out.printf("Risk assessment completed in %.1f hours%n",
+	            System.out.printf("Per-rupture expected loss assessment completed in %.1f hours%n",
 	                    elapsedSeconds / 3600.0);
 	        } else if (elapsedSeconds >= 60) {
-	            System.out.printf("Risk assessment completed in %.1f minutes%n",
+	            System.out.printf("Per-rupture expected loss assessment completed in %.1f minutes%n",
 	                    elapsedSeconds / 60.0);
 	        } else {
-	            System.out.printf("Risk assessment completed in %.1f seconds%n",
+	            System.out.printf("Per-rupture expected loss assessment completed in %.1f seconds%n",
 	                    elapsedSeconds);
 	        }
         

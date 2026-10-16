@@ -11,7 +11,7 @@ import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
 import scratch.anne.risk_system_vb.engine.logic_tree.StreamingBranchLecBuilder;
 import scratch.anne.risk_system_vb.io.readers.RuptureLossLookupReader;
 import scratch.anne.risk_system_vb.io.readers.RuptureLossLookupReader.RuptureAttributes;
-import scratch.anne.risk_system_vb.io.writers.FullRuptureCurveExporter;
+import scratch.anne.risk_system_vb.io.writers.PseudoLossCurveExporter;
 
 /**
  * One-off diagnostic: exports the FULL discrete-rank curve (every
@@ -19,7 +19,7 @@ import scratch.anne.risk_system_vb.io.writers.FullRuptureCurveExporter;
  * set of specific branches, so you can check them directly against the
  * ~27-point summary curve / EAL ratio computation in Python.
  */
-public class FullRuptureCurveExportExample {
+public class PseudoLossCurveExportExample {
 
     public static void main(String[] args) throws Exception {
         
@@ -31,10 +31,10 @@ public class FullRuptureCurveExportExample {
 //		int maxBranches = Integer.MAX_VALUE;
 		String fileSuffix = maxBranches != Integer.MAX_VALUE ? "_subset-n-" + maxBranches : "";
 
-        Path exportedCsv = baseFolder.resolve(inputFolder).resolve(fileTag + "_eal-per-rup.csv");
+        Path inputCsv = baseFolder.resolve(inputFolder).resolve(fileTag + "_eal-per-rup.csv");
         Path contributionsParquet = baseFolder.resolve(inputFolder).resolve(fileTag + "_branch-rupture-contributions" + fileSuffix + ".parquet");
         
-        Path outputCsv = baseFolder.resolve(inputFolder).resolve(fileTag + "_branch-full-lecs" + fileSuffix + ".csv");
+        Path outputCsv = baseFolder.resolve(inputFolder).resolve(fileTag + "_branch-pseudo-loss-curve" + fileSuffix + ".csv");
 
         // long-format output, one row per (branch, rank), with the
         // specific sourceId/ruptureId/fltSysRupIndex/magnitude
@@ -42,23 +42,23 @@ public class FullRuptureCurveExportExample {
         // FullRuptureCurveExporter. Parquet only (not human-readable);
         // the wide CSV below carries the same per-rupture attributes in
         // a human-readable form instead.
-        Path fullLecKeysParquet = baseFolder.resolve(inputFolder).resolve(fileTag + "_branch-full-lecs" + fileSuffix + ".parquet");
+        Path outputParquet = baseFolder.resolve(inputFolder).resolve(fileTag + "_branch-pseudo-loss-curve" + fileSuffix + ".parquet");
 
-        Map<RuptureKey, Double> fixedLossLookup = RuptureLossLookupReader.read(exportedCsv);
-        Map<RuptureKey, RuptureAttributes> ruptureAttributes = RuptureLossLookupReader.readRuptureAttributes(exportedCsv);
+        Map<RuptureKey, Double> fixedLossLookup = RuptureLossLookupReader.read(inputCsv);
+        Map<RuptureKey, RuptureAttributes> ruptureAttributes = RuptureLossLookupReader.readRuptureAttributes(inputCsv);
 
         // pick a few branches to check -- e.g. the first few, or specific indices.
         // This subset only ever limits the wide CSV output below; the
         // Parquet output always covers every branch in
         // contributionsParquet, regardless of this set.
         Set<Integer> branchesToExport = Set.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
-        exportFullCurves(contributionsParquet, fixedLossLookup, ruptureAttributes, branchesToExport,
-	                outputCsv, fullLecKeysParquet);
+        exportPseudoLossCurves(contributionsParquet, fixedLossLookup, ruptureAttributes, branchesToExport,
+	                outputCsv, outputParquet);
 	    }
     
     
-    private static void exportFullCurves(Path contributionsParquet, Map<RuptureKey, Double> fixedLossLookup,
-        Map<RuptureKey, RuptureAttributes> ruptureAttributes, Set<Integer> targetBranches, Path outputCsv, Path fullLecKeysParquet)
+    private static void exportPseudoLossCurves(Path contributionsParquet, Map<RuptureKey, Double> fixedLossLookup,
+        Map<RuptureKey, RuptureAttributes> ruptureAttributes, Set<Integer> targetBranches, Path outputCsv, Path outputParquet)
         throws SQLException, java.io.IOException {
 
 		System.out.println("Extracting full curves for branches: " + targetBranches
@@ -72,7 +72,7 @@ public class FullRuptureCurveExportExample {
 		// it stays flat regardless of total branch count.
 		Map<Integer, LossExceedanceCurve> curvesByBranch = new java.util.HashMap<>();
 
-		try (FullRuptureCurveExporter exporter = new FullRuptureCurveExporter(fullLecKeysParquet)) {
+		try (PseudoLossCurveExporter exporter = new PseudoLossCurveExporter(outputParquet)) {
 			StreamingBranchLecBuilder.streamDiscreteRankCurves(contributionsParquet, fixedLossLookup, (branchIndex, curve) -> {
 				// always written, for every branch, regardless of targetBranches
 				exporter.writeParquet(branchIndex, curve, ruptureAttributes);
@@ -90,7 +90,7 @@ public class FullRuptureCurveExportExample {
 		}
 
 		System.out.println("Wrote curves CSV (branches " + targetBranches + ") to " + outputCsv);
-		System.out.println("Wrote per-rupture curve keys Parquet (all branches) to " + fullLecKeysParquet);
+		System.out.println("Wrote per-rupture curve keys Parquet (all branches) to " + outputParquet);
 	}
     
 }

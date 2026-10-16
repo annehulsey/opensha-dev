@@ -28,7 +28,7 @@ import scratch.anne.risk_system_vb.domain.hazard.RuptureKey;
 import scratch.anne.risk_system_vb.io.readers.RuptureLossLookupReader.RuptureAttributes;
 
 /**
- * Writes the FULL discrete-rank loss-exceedance curve for one or more
+ * Writes the FULL discrete-rank pseudo loss curve for one or more
  * branches.
  *
  * <p>Two independent output formats, same underlying per-branch,
@@ -86,12 +86,12 @@ import scratch.anne.risk_system_vb.io.readers.RuptureLossLookupReader.RuptureAtt
  * curve at once, since it needs the full set to compute the shared
  * union loss axis. Close once at the end.</p>
  */
-public final class FullRuptureCurveExporter implements AutoCloseable {
+public final class PseudoLossCurveExporter implements AutoCloseable {
 
     private static final Schema SCHEMA = new Schema.Parser().parse("""
             {
               "type": "record",
-              "name": "FullRuptureCurveRow",
+              "name": "PseudoLossCurveRow",
               "namespace": "scratch.anne.risk_system_vb",
               "fields": [
                 {"name": "branchIndex",         "type": "int"},
@@ -113,7 +113,7 @@ public final class FullRuptureCurveExporter implements AutoCloseable {
      * anything opened by this constructor and can still be called on an
      * instance created this way.
      */
-    public FullRuptureCurveExporter(Path parquetFile) throws IOException {
+    public PseudoLossCurveExporter(Path parquetFile) throws IOException {
         if (parquetFile != null) {
             OutputFile out = new LocalOutputFile(parquetFile.toAbsolutePath().normalize());
             this.parquetWriter = AvroParquetWriter
